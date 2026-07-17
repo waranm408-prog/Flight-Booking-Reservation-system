@@ -101,7 +101,7 @@ async function sendBookingConfirmationEmail(recipientEmail, bookingData, payment
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
-    },
+    },D
   });
 
   const subject = `Booking confirmed for ${bookingData.flightName || 'your flight'}`;
