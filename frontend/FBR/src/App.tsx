@@ -1,4 +1,4 @@
-
+// Removed SpeedInsights import to fix: Cannot find module '@vercel/speed-insights/react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import './App.css'
 import Navbar from './components/Navbar';
@@ -24,7 +24,6 @@ function App() {
 
   return (
     <>
-      
      <BrowserRouter>
      <Routes>
       <Route path="/" element={<Home />} />
