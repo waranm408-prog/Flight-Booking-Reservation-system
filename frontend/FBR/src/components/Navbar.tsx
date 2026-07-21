@@ -113,13 +113,13 @@ const Navbar = () => {
                 </Link>
               </li>
               <li >
-                <Link
-                  to="/about"
+                <a href="#about"
+                  
                   className="block hover:text-blue-500"
                   onClick={() => setOpen(false)}
                 >
                   About
-                </Link>
+                </a>
               </li>
            <li >
                 <Link 

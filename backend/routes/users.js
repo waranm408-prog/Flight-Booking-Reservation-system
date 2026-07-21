@@ -2,7 +2,7 @@ var express = require('express');
 var bcrypt = require('bcryptjs');
 var jwt = require('jsonwebtoken');
 var crypto = require('crypto');
-var nodemailer = require('nodemailer');
+var { sendEmail } = require('../utils/brevoEmail');
 var User = require('../Models/User');
 var router = express.Router();
 
@@ -13,7 +13,7 @@ function createToken(user) {
   return jwt.sign(
     { id: user._id || user.id || user.email, email: user.email, name: user.name, role },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '5678d' }
   );
 }
 
@@ -30,43 +30,34 @@ function authenticateToken(req, res, next) {
 }
 
 function isEmailConfigured() {
-  var host = process.env.EMAIL_HOST && process.env.EMAIL_HOST.trim();
-  var user = process.env.EMAIL_USER && process.env.EMAIL_USER.trim();
-  var pass = process.env.EMAIL_PASS && process.env.EMAIL_PASS.trim();
-
-  return Boolean(
-    host &&
-    user &&
-    pass &&
-    !user.includes('your_') &&
-    !user.includes('example') &&
-    !pass.includes('your_')
-  );
+  var apiKey = process.env.BREVO_API_KEY && process.env.BREVO_API_KEY.trim();
+  var from = process.env.EMAIL_FROM && process.env.EMAIL_FROM.trim();
+  return Boolean(apiKey && from);
 }
 
 async function sendOtpEmail(email, otp) {
   if (!isEmailConfigured()) {
     console.log(`Password reset OTP for ${email}: ${otp}`);
-    console.log('Configure EMAIL_HOST, EMAIL_USER, and EMAIL_PASS in backend/.env to send OTP emails.');
-    return;
+    console.log('Configure BREVO_API_KEY and EMAIL_FROM in backend/.env to send OTP emails.');
+    return { ok: true, fallback: true };
   }
 
-  var transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to: email,
-    subject: 'Password reset OTP',
-    html: `<p>Your password reset OTP is <strong>${otp}</strong>.</p><p>It expires in 10 minutes.</p>`,
-  });
+  try {
+    await sendEmail({
+      to: email,
+      subject: 'Password reset OTP',
+      html: `<p>Your password reset OTP is <strong>${otp}</strong>.</p><p>It expires in 10 minutes.</p>`,
+      senderName: 'SkyElite Support',
+      senderEmail: process.env.EMAIL_FROM,
+    });
+    console.log(`OTP email sent successfully to ${email}`);
+    return { ok: true, fallback: false };
+  } catch (error) {
+    const errorMsg = error?.message || String(error);
+    console.error('Failed to send OTP email via Brevo:', errorMsg);
+    console.log(`OTP fallback for ${email}: ${otp}`);
+    return { ok: false, fallback: true, error: errorMsg };
+  }
 }
 
 router.post('/signup', async function (req, res) {
@@ -171,7 +162,19 @@ router.post('/forgot-password', async function (req, res) {
     user.resetOtp = otp;
     user.resetOtpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
-    await sendOtpEmail(user.email, otp);
+    var emailResult = await sendOtpEmail(user.email, otp);
+
+    if (emailResult && emailResult.ok && emailResult.fallback) {
+      return res.json({
+        message: `OTP generated successfully for ${user.email}. Please use the OTP shown in the server console or verify your email provider configuration.`,
+      });
+    }
+
+    if (emailResult && !emailResult.ok && emailResult.fallback) {
+      return res.json({
+        message: `OTP generated successfully for ${user.email}. The email could not be delivered right now, but the OTP is active for this session.`,
+      });
+    }
 
     res.json({ message: `OTP sent successfully to ${user.email}.` });
   } catch (error) {

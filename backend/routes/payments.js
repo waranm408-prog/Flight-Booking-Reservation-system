@@ -1,8 +1,8 @@
 const express = require('express');
 const crypto = require('crypto');
-const nodemailer = require('nodemailer');
 const Razorpay = require('razorpay');
 const Booking = require('../Models/Booking');
+const { sendEmail } = require('../utils/brevoEmail');
 require('dotenv').config();
 
 const router = express.Router();
@@ -22,11 +22,10 @@ function getRazorpayClient() {
 }
 
 function isEmailConfigured() {
-  const host = process.env.EMAIL_HOST && process.env.EMAIL_HOST.trim();
-  const user = process.env.EMAIL_USER && process.env.EMAIL_USER.trim();
-  const pass = process.env.EMAIL_PASS && process.env.EMAIL_PASS.trim();
+  const apiKey = process.env.BREVO_API_KEY && process.env.BREVO_API_KEY.trim();
+  const from = process.env.EMAIL_FROM && process.env.EMAIL_FROM.trim();
 
-  return Boolean(host && user && pass);
+  return Boolean(apiKey && from);
 }
 
 function resolveRecipientEmail(bookingData, fallbackEmail = '') {
@@ -90,19 +89,9 @@ async function sendBookingConfirmationEmail(recipientEmail, bookingData, payment
   }
 
   if (!isEmailConfigured()) {
-    console.log(`Booking confirmation email for ${recipientEmail} would be sent. Configure email credentials to enable delivery.`);
+    console.log(`Booking confirmation email for ${recipientEmail} would be sent. Configure BREVO_API_KEY and EMAIL_FROM to enable delivery.`);
     return;
   }
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: Number(process.env.EMAIL_PORT || 587),
-    secure: process.env.EMAIL_SECURE === 'true',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },D
-  });
 
   const subject = `Booking confirmed for ${bookingData.flightName || 'your flight'}`;
   const html = `
@@ -124,12 +113,18 @@ async function sendBookingConfirmationEmail(recipientEmail, bookingData, payment
     </div>
   `;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
-    to: recipientEmail,
-    subject,
-    html,
-  });
+  try {
+    await sendEmail({
+      to: recipientEmail,
+      subject,
+      html,
+      senderName: 'SkyElite Support',
+      senderEmail: process.env.EMAIL_FROM,
+    });
+    console.log(`Booking confirmation email sent to ${recipientEmail}`);
+  } catch (error) {
+    console.error(`Failed to send booking confirmation to ${recipientEmail}:`, error?.message || error);
+  }
 }
 
 router.post('/create-order', async function (req, res) {
@@ -216,12 +211,9 @@ router.post('/verify', async function (req, res) {
       await booking.save();
 
       try {
-        await sendBookingConfirmationEmail(
-          userEmail,
-          bookingData,
-          razorpay_payment_id,
-          razorpay_order_id
-        );
+        if (process.env.BREVO_API_KEY && process.env.EMAIL_FROM) {
+          await sendBookingConfirmationEmail(userEmail, booking, booking.paymentId, booking.orderId);
+        }
       } catch (mailError) {
         console.error('Booking confirmation email failed:', mailError);
       }
