@@ -1,0 +1,177 @@
+I don't have write permissions to that repository. However, I can provide you with the complete README content that you can add yourself:
+
+```markdown
+# Flight Booking & Reservation System
+
+A full-stack web application for booking and managing flight reservations. This system provides both user and admin interfaces to search for flights, make bookings, process payments, and manage reservations.
+
+**Live Demo:** https://flight-booking-reservation-system.vercel.app
+
+## Stack
+
+- **Language(s):** JavaScript, TypeScript
+- **Framework / Runtime:** Express.js 4.16, Node.js
+- **Database:** MongoDB
+- **Frontend:** JavaScript (Express + Jade templates)
+- **Notable libraries:** 
+  - `jsonwebtoken` — JWT-based authentication for users and admins
+  - `bcryptjs` — Password hashing and encryption
+  - `razorpay` — Payment processing gateway
+  - `mongoose` — MongoDB object modeling
+  - `sib-api-v3-sdk` — Email notifications
+  - `cors` — Cross-origin resource sharing
+
+## How it's organized
+
+```
+backend/
+  app.js                 Express application setup, middleware configuration
+  package.json          Backend dependencies (Express, MongoDB, auth, payments)
+  Models/               Mongoose schemas (User, Flight, Booking, Payment)
+  routes/
+    users.js            Authentication endpoints (sign up, login, password reset)
+    flights.js          Flight search and admin flight management
+    bookings.js         Booking retrieval and admin status updates
+    payments.js         Payment processing with Razorpay
+    admin.js            Admin-only operations
+    index.js            Base routes
+  middleware/           Express middleware (authentication, validation)
+  utils/                Helper functions and utilities
+  views/                Jade templates for error pages and static content
+  public/               Static assets
+
+frontend/
+  FBR/                  Frontend React/JavaScript application
+  package.json          Frontend dependencies
+```
+
+**Request Flow:**
+1. Client sends requests from the frontend to the backend API endpoints (`/flights`, `/bookings`, `/users`, etc.)
+2. Express middleware validates JWT tokens and applies CORS policies
+3. Routes authenticate users (regular users have role 'user', admins have role 'admin')
+4. Database queries execute via Mongoose models (Flight, Booking, User, Payment)
+5. Payments are processed through Razorpay integration for secure transactions
+6. Email notifications are sent via SendInBlue (sib-api-v3-sdk) for confirmations and updates
+
+## How to run it
+
+### Prerequisites
+- Node.js (v14 or higher)
+- MongoDB instance (local or Atlas)
+- Razorpay API credentials
+- SendInBlue API key
+
+### Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/waranm408-prog/Flight-Booking-Reservation-system.git
+   cd Flight-Booking-Reservation-system
+   ```
+
+2. **Backend setup:**
+   ```bash
+   cd backend
+   npm install
+   ```
+
+   Create a `.env` file in the `backend/` directory:
+   ```
+   MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>
+   JWT_SECRET=your_jwt_secret_key
+   CORS_ORIGIN=http://localhost:3000
+   RAZORPAY_KEY_ID=your_razorpay_key
+   RAZORPAY_KEY_SECRET=your_razorpay_secret
+   SENDINBLUE_API_KEY=your_sendinblue_api_key
+   ```
+
+   Start the backend:
+   ```bash
+   npm start
+   ```
+   The backend server will run on `http://localhost:3001` (or configured port).
+
+3. **Frontend setup:**
+   ```bash
+   cd frontend
+   npm install
+   npm start
+   ```
+   The frontend will run on `http://localhost:3000`.
+
+### Test Credentials
+
+**Regular User:**
+- Email: `maheshsiva408@gmail.com`
+- Password: `mahesh@02`
+
+**Admin User:**
+- Email: `admin@gmail.com`
+- Password: `admin1234`
+
+### Sample Flight Routes
+The system includes pre-configured flight routes:
+- Coimbatore → Trichy
+- Delhi → Mumbai
+- Chennai → Bangalore
+- Singapore → Chennai
+
+## Features
+
+- **User Authentication:** Sign up, login, JWT-based session management
+- **Flight Search:** Filter flights by origin and destination (case-insensitive regex search)
+- **Flight Booking:** Reserve flights with passenger details
+- **Payment Processing:** Secure payments via Razorpay integration
+- **Admin Dashboard:** Manage flights, view all bookings, update booking statuses
+- **Email Notifications:** Automated confirmations and updates via SendInBlue
+- **Security:** Password encryption with bcryptjs, JWT authentication, CORS protection
+
+## API Endpoints
+
+### Users (`/users`)
+- `POST /signup` — Create a new user account
+- `POST /login` — User login (returns JWT token)
+- `POST /forgotpassword` — Initiate password reset
+
+### Flights (`/flights`)
+- `GET /` — List all available flights
+- `GET /search?from=<origin>&to=<destination>` — Search flights
+
+
+### Bookings (`/bookings`)
+- `GET /?email=<email>` (authenticated) — Retrieve user's bookings
+- `PUT /:id/status` (admin only) — Update booking status
+
+### Payments (`/payments`)
+- `POST /create-order` (authenticated) — Create Razorpay payment order
+- `POST /verify-payment` (authenticated) — Verify payment and confirm booking
+
+### Admin (`/admin`)
+- Admin-specific endpoints for managing flights and bookings
+
+## Try asking
+
+- "How do I add a new flight to the system as an admin?"
+- "What happens when a user completes a payment for a booking?"
+- "How are bookings filtered and retrieved for users vs. admins?"
+
+## License
+
+This project is open source and available under the MIT License.
+```
+
+To add this README to your repository, you can:
+
+1. **Via GitHub Web UI:**
+   - Go to your repository on GitHub
+   - Click "Add file" → "Create new file"
+   - Name it `README.md`
+   - Paste the content above
+   - Commit with message "Add comprehensive README"
+
+2. **Via Git CLI:**
+   - Create the file locally: `echo "..." > README.md`
+   - Stage and commit: `git add README.md && git commit -m "Add comprehensive README"`
+   - Push: `git push origin main`
+
+The README provides a complete overview of your flight booking system, including stack information, project organization, setup instructions, and API documentation.
