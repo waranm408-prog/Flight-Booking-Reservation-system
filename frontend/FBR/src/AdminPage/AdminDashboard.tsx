@@ -8,6 +8,9 @@ export default function AdminDashboard() {
     usersCount: 0,
     paymentsCount: 0,
     totalRevenue: 0,
+    bookingRate: 0,
+    cancellationRate: 0,
+    cancelledBookingsCount: 0,
   });
 
   const chartMetrics = [
@@ -18,7 +21,8 @@ export default function AdminDashboard() {
   ];
 
   const maxMetricValue = Math.max(...chartMetrics.map((metric) => metric.value), 1);
-  const bookingRate = stats.usersCount ? Math.round((stats.bookingsCount / stats.usersCount) * 100) : 0;
+  const cancellationRate = stats.cancellationRate || 0;
+  const cancelledBookingsCount = stats.cancelledBookingsCount || 0;
 
   useEffect(() => {
     let mounted = true;
@@ -31,6 +35,9 @@ export default function AdminDashboard() {
           usersCount: res.data.usersCount || 0,
           paymentsCount: res.data.paymentsCount || 0,
           totalRevenue: res.data.totalRevenue || 0,
+          bookingRate: res.data.bookingRate || 0,
+          cancellationRate: res.data.cancellationRate || 0,
+          cancelledBookingsCount: res.data.cancelledBookingsCount || 0,
         });
       })
       .catch(err => console.error('Failed to load admin stats', err));
@@ -74,15 +81,13 @@ export default function AdminDashboard() {
       
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-2xl bg-slate-800/80 p-4 text-white shadow">
-          <div className="text-sm text-slate-200">Booking Rate</div>
+          <div className="text-sm text-slate-200">Cancelled Bookings</div>
           <div className="mt-2 flex items-center gap-4">
-            <div className="text-4xl font-bold">{bookingRate}%</div>
-            <div className="text-sm text-slate-300">of users made at least one booking</div>
+            <div className="text-4xl font-bold">{cancelledBookingsCount}</div>
+            <div className="text-sm text-slate-300">users cancelled bookings</div>
           </div>
-          <div className="mt-4">
-            <div className="w-full h-2 bg-slate-700 rounded-full overflow-hidden">
-              <div className="h-2 bg-emerald-400" style={{ width: `${Math.min(100, bookingRate)}%` }} />
-            </div>
+          <div className="mt-4 text-sm text-slate-400">
+            Cancellation rate: {cancellationRate}% of all bookings
           </div>
         </div>
 

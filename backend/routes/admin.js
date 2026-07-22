@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const Booking = require('../Models/Booking');
 const Flight = require('../Models/Flight');
 const User = require('../Models/User');
+const { fetchLiveFlights } = require('./flights');
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'FBR_SECRET_KEY';
@@ -20,6 +21,44 @@ function authenticateAdmin(req, res, next) {
     next();
   });
 }
+
+function getTodayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = `${today.getMonth() + 1}`.padStart(2, '0');
+  const day = `${today.getDate()}`.padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+router.get('/flights', authenticateAdmin, async function (req, res) {
+  try {
+    const requestedDate = (req.query.date || req.query.departureDate || 'today').toString().trim();
+    const targetDate = requestedDate.toLowerCase() === 'today' ? getTodayDateString() : requestedDate;
+
+    const flights = await fetchLiveFlights('chennai', 'bangalore', 'Economy', targetDate, '', false);
+
+    const formattedFlights = (flights || []).map((flight) => ({
+      id: flight.id,
+      flightNo: flight.flightNo,
+      airline: flight.airline,
+      origin: flight.origin,
+      destination: flight.destination,
+      departureDate: targetDate || getTodayDateString(),
+      departureTime: flight.departureTime,
+      arrivalTime: flight.arrivalTime,
+      duration: flight.duration,
+      stops: flight.stops || 0,
+      price: flight.price,
+      cabinClass: flight.cabinClass || 'Economy',
+      seatsAvailable: flight.seatsAvailable || 0,
+    }));
+
+    return res.json({ flights: formattedFlights });
+  } catch (error) {
+    console.error('Failed to load admin flights:', error);
+    res.status(500).json({ message: 'Failed to load today’s flights.' });
+  }
+});
 
 router.get('/users', authenticateAdmin, async function (req, res) {
   try {
@@ -50,7 +89,7 @@ router.get('/users', authenticateAdmin, async function (req, res) {
 
 router.get('/stats', async function (req, res) {
   try {
-    const [bookingsCount, flightsCount, usersCount, paymentsCountAgg, revenueAgg] = await Promise.all([
+    const [bookingsCount, flightsCount, usersCount, paymentsCountAgg, revenueAgg, bookedUserIds, cancelledBookingsCount] = await Promise.all([
       Booking.countDocuments(),
       Flight.countDocuments(),
       User.countDocuments(),
@@ -59,9 +98,14 @@ router.get('/stats', async function (req, res) {
         { $match: { paymentId: { $exists: true, $ne: '' } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
+      Booking.distinct('userId', { userId: { $ne: null } }),
+      Booking.countDocuments({ $or: [{ status: 'cancelled' }, { status: 'canceled' }] }),
     ]);
 
     const totalRevenue = Array.isArray(revenueAgg) && revenueAgg[0] ? revenueAgg[0].total : 0;
+    const uniqueBookedUsers = Array.isArray(bookedUserIds) ? bookedUserIds.length : 0;
+    const bookingRate = usersCount > 0 ? Math.round((uniqueBookedUsers / usersCount) * 100) : 0;
+    const cancellationRate = bookingsCount > 0 ? Math.round((cancelledBookingsCount / bookingsCount) * 100) : 0;
 
     res.json({
       bookingsCount,
@@ -69,6 +113,9 @@ router.get('/stats', async function (req, res) {
       usersCount,
       paymentsCount: paymentsCountAgg,
       totalRevenue,
+      bookingRate,
+      cancellationRate,
+      cancelledBookingsCount,
     });
   } catch (error) {
     console.error('Failed to load admin stats:', error);

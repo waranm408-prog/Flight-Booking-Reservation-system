@@ -1,8 +1,12 @@
 import { ShieldCheck, Headphones, Award, Globe, Users, Target } from 'lucide-react';
+import Navbar from "../components/Navbar";
 
  function About() {
   return (
-     <section id="about">
+    <>
+      
+      <Navbar />
+        
     <div className="min-h-screen bg-orange-200 font-sans antialiased text-slate-800 py-12 ">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
         
@@ -141,7 +145,9 @@ import { ShieldCheck, Headphones, Award, Globe, Users, Target } from 'lucide-rea
 
       </div>
     </div>
-  </section>
+  
+  </>
   );
 }
+
 export default About;

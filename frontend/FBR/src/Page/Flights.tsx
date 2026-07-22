@@ -7,7 +7,7 @@ import api from "../api/axios";
 
 
 interface Flights {
-  id: number;
+  id: number | string;
   airline: string;
   logo: string;
   departureTime: string;
@@ -18,7 +18,18 @@ interface Flights {
   cabinClass: string;
   origin: string;
   destination: string;
+  flightNo?: string;
 }
+
+const locationSuggestions = [
+  'Chennai', 'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune',
+  'Ahmedabad', 'Jaipur', 'Goa', 'Trivandrum', 'Lucknow', 'Chandigarh', 'Amritsar',
+  'Surat', 'Visakhapatnam', 'Bhubaneswar', 'Indore', 'Nagpur', 'Raipur', 'Guwahati',
+  'Patna', 'Kanpur', 'Srinagar', 'Jammu', 'Leh', 'Mangalore', 'Coimbatore',
+  'Tiruchirappalli', 'Vijayawada', 'Bhopal', 'Jamnagar', 'Rajkot', 'Singapore',
+  'Dubai', 'London', 'New York', 'Toronto', 'Sydney', 'Melbourne', 'Paris', 'Frankfurt',
+  'Doha', 'Abu Dhabi', 'Dublin', 'Rome', 'Madrid', 'Istanbul'
+];
 
 function Flights() {
   const navigate = useNavigate();
@@ -26,6 +37,8 @@ function Flights() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [authError, setAuthError] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
 
   const [initialSearchDone, setInitialSearchDone] = useState(false);
   const [searchParams] = useSearchParams();
@@ -35,11 +48,25 @@ function Flights() {
       fromLocation: searchParams.get('from') || "",
       toLocation: searchParams.get('to') || "",
       departureDate: searchParams.get('departureDate') || "",
+      departureTime: searchParams.get('departureTime') || "",
       returnDate: "",
       passengers: "1",
       cabinClass: "Economy",
     },
     onSubmit: async (values) => {
+      const selectedDate = values.departureDate;
+      if (selectedDate) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const selected = new Date(selectedDate);
+        if (selected < today) {
+          setError("Please select a future or today departure date.");
+          setFlights([]);
+          setLoading(false);
+          return;
+        }
+      }
+
       setLoading(true);
       setError("");
       setFlights([]);
@@ -50,22 +77,58 @@ function Flights() {
             from: values.fromLocation,
             to: values.toLocation,
             departureDate: values.departureDate,
+            departureTime: values.departureTime,
+            cabinClass: values.cabinClass,
           },
         });
 
         const fetchedFlights: Flights[] = response.data?.flights || [];
         if (fetchedFlights.length === 0) {
-          setError("No flights found for the selected route.");
+          setFlights([]);
+          setError(values.departureTime
+            ? "No flights are available at or after the selected departure time. Try a later time or another route."
+            : "No flights found for the selected route.");
+        } else {
+          setFlights(fetchedFlights);
+          setError("");
         }
-        setFlights(fetchedFlights);
       } catch (err) {
         console.error('Flight fetch error:', err);
+        setFlights([]);
         setError("Failed to fetch flights. Please try again later.");
       } finally {
         setLoading(false);
       }
     },
   });
+
+  const handleLocationChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    formik.handleChange(event);
+
+    if (!value.trim()) {
+      setSuggestions([]);
+      setActiveField(null);
+      return;
+    }
+
+    const filtered = locationSuggestions.filter((location) =>
+      location.toLowerCase().includes(value.toLowerCase())
+    );
+
+    setSuggestions(filtered.slice(0, 6));
+    setActiveField(name === 'fromLocation' ? 'from' : 'to');
+  };
+
+  const selectSuggestion = (location: string) => {
+    if (activeField === 'from') {
+      formik.setFieldValue('fromLocation', location);
+    } else if (activeField === 'to') {
+      formik.setFieldValue('toLocation', location);
+    }
+    setSuggestions([]);
+    setActiveField(null);
+  };
 
   const isLoggedIn = () => {
     return Boolean(
@@ -107,6 +170,7 @@ function Flights() {
         fromLocation: from,
         toLocation: to,
         departureDate,
+        departureTime: searchParams.get('departureTime') || '',
         returnDate: '',
         passengers: formik.values.passengers,
         cabinClass: formik.values.cabinClass,
@@ -134,28 +198,43 @@ function Flights() {
               className="border p-2 rounded-lg text-sm font-medium text-slate-600 bg-transparent outline-none cursor-pointer"
             >
               <option value="Economy">Economy</option>
-              <option value="Premium">Premium Economy</option>
+              
               <option value="Business">Business Class</option>
               <option value="First">First Class</option>
             </select>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
             {/* From */}
             <div className="p-3 bg-slate-50 rounded-xl border border-transparent focus-within:border-blue-500 transition-all">
               <label className="text-xs text-slate-500 font-semibold flex items-center gap-1 mb-1">
                 <MapPin size={14} className="text-slate-400" />
                 Flying From
               </label>
-              <input
-                type="text"
-                name="fromLocation"
-                placeholder="City  (e.g., chennai)"
-                value={formik.values.fromLocation}
-                onChange={formik.handleChange}
-                className="w-full bg-transparent outline-none text-sm font-medium"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  name="fromLocation"
+                  placeholder="City (e.g., Chennai)"
+                  value={formik.values.fromLocation}
+                  onChange={handleLocationChange}
+                  className="w-full bg-transparent outline-none text-sm font-medium"
+                  required
+                />
+                {activeField === 'from' && suggestions.length > 0 ? (
+                  <ul className="absolute z-20 mt-2 max-h-44 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    {suggestions.map((location) => (
+                      <li
+                        key={location}
+                        className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                        onClick={() => selectSuggestion(location)}
+                      >
+                        {location}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             </div>
 
             {/* To */}
@@ -164,15 +243,30 @@ function Flights() {
                 <MapPin size={14} className="text-slate-400" />
                 Where To?
               </label>
-              <input
-                type="text"
-                name="toLocation"
-                placeholder="Destination(e.g.,Bangalore)"
-                value={formik.values.toLocation}
-                onChange={formik.handleChange}
-                className="w-full bg-transparent outline-none text-sm font-medium"
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  name="toLocation"
+                  placeholder="Destination (e.g., Bangalore)"
+                  value={formik.values.toLocation}
+                  onChange={handleLocationChange}
+                  className="w-full bg-transparent outline-none text-sm font-medium"
+                  required
+                />
+                {activeField === 'to' && suggestions.length > 0 ? (
+                  <ul className="absolute z-20 mt-2 max-h-44 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    {suggestions.map((location) => (
+                      <li
+                        key={location}
+                        className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                        onClick={() => selectSuggestion(location)}
+                      >
+                        {location}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             </div>
 
             {/* Departure */}
@@ -188,6 +282,22 @@ function Flights() {
                 onChange={formik.handleChange}
                 className="w-full bg-transparent outline-none text-sm font-medium text-slate-700"
                 required
+              />
+            </div>
+
+            {/* Time */}
+            <div className="p-3 bg-slate-50 rounded-xl border border-transparent focus-within:border-blue-500 transition-all">
+              <label className="text-xs text-slate-500 font-semibold flex items-center gap-1 mb-1">
+                <Clock size={14} className="text-slate-400" />
+                Time
+              </label>
+              <input
+                type="time"
+                name="departureTime"
+                value={formik.values.departureTime}
+                onChange={formik.handleChange}
+                className="w-full bg-transparent outline-none text-sm font-medium text-slate-700"
+                 required
               />
             </div>
 
@@ -256,6 +366,14 @@ function Flights() {
 
           {!loading && flights.length > 0 && (
             <div className="space-y-4">
+              <div className="flex flex-col gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <span className="font-semibold">Showing {flights.length} flights</span> from {formik.values.fromLocation} to {formik.values.toLocation}
+                </div>
+                <div className="font-medium">
+                  Departure: {formik.values.departureDate || 'Today'}
+                </div>
+              </div>
               <h3 className="text-xl font-bold text-slate-700 mb-2">
                 Available Flights from {formik.values.fromLocation} to {formik.values.toLocation}
               </h3>
@@ -277,6 +395,7 @@ function Flights() {
                       <h4 className="font-bold text-slate-800">{flight.airline}</h4>
                       <p className="text-xs text-slate-400 font-medium">{flight.cabinClass}</p>
                       <p className="text-xs text-slate-400">{flight.origin} → {flight.destination}</p>
+                      {flight.flightNo ? <p className="text-xs text-slate-400">Flight {flight.flightNo}</p> : null}
                     </div>
                   </div>
 

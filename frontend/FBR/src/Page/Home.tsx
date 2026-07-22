@@ -1,12 +1,24 @@
+import { useState } from "react";
 import { useFormik } from "formik";
 import { useNavigate } from "react-router-dom";
 import { Calendar, MapPin } from "lucide-react";
 
 import Navbar from "../components/Navbar";
-import About from "./About";
+
+const locationSuggestions = [
+  'Chennai', 'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune',
+  'Ahmedabad', 'Jaipur', 'Goa', 'Trivandrum', 'Lucknow', 'Chandigarh', 'Amritsar',
+  'Surat', 'Visakhapatnam', 'Bhubaneswar', 'Indore', 'Nagpur', 'Raipur', 'Guwahati',
+  'Patna', 'Kanpur', 'Srinagar', 'Jammu', 'Leh', 'Mangalore', 'Coimbatore',
+  'Tiruchirappalli', 'Vijayawada', 'Bhopal', 'Jamnagar', 'Rajkot', 'Singapore',
+  'Dubai', 'London', 'New York', 'Toronto', 'Sydney', 'Melbourne', 'Paris', 'Frankfurt',
+  'Doha', 'Abu Dhabi', 'Dublin', 'Rome', 'Madrid', 'Istanbul'
+];
 
 export default function Home() {
   const navigate = useNavigate();
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
 
   const formik = useFormik({
     initialValues: {
@@ -23,6 +35,34 @@ export default function Home() {
       }
     },
   });
+
+  const handleLocationChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    formik.handleChange(event);
+
+    if (!value.trim()) {
+      setSuggestions([]);
+      setActiveField(null);
+      return;
+    }
+
+    const filtered = locationSuggestions.filter((location) =>
+      location.toLowerCase().includes(value.toLowerCase())
+    );
+
+    setSuggestions(filtered.slice(0, 6));
+    setActiveField(name === 'fromLocation' ? 'from' : 'to');
+  };
+
+  const selectSuggestion = (location: string) => {
+    if (activeField === 'from') {
+      formik.setFieldValue('fromLocation', location);
+    } else if (activeField === 'to') {
+      formik.setFieldValue('toLocation', location);
+    }
+    setSuggestions([]);
+    setActiveField(null);
+  };
 
 
 
@@ -68,14 +108,29 @@ export default function Home() {
                       Flying From
                     </label>
 
-                    <input
-                      type="text"
-                      name="fromLocation"
-                      placeholder="Enter your departure city (e.g., Chennai)"
-                      value={formik.values.fromLocation}
-                      onChange={formik.handleChange}
-                      className="w-full bg-transparent outline-none mt-2"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="fromLocation"
+                        placeholder="Enter your departure city (e.g., Chennai)"
+                        value={formik.values.fromLocation}
+                        onChange={handleLocationChange}
+                        className="w-full bg-transparent outline-none mt-2"
+                      />
+                      {activeField === 'from' && suggestions.length > 0 ? (
+                        <ul className="absolute z-20 mt-2 max-h-44 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                          {suggestions.map((location) => (
+                            <li
+                              key={location}
+                              className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                              onClick={() => selectSuggestion(location)}
+                            >
+                              {location}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   </div>
 
                   {/* To */}
@@ -85,14 +140,29 @@ export default function Home() {
                       Going To
                     </label>
 
-                    <input
-                      type="text"
-                      name="toLocation"
-                      placeholder="Enter Destination (e.g., Mumbai)"
-                      value={formik.values.toLocation}
-                      onChange={formik.handleChange}
-                      className="w-full bg-transparent outline-none mt-2"
-                    />
+                    <div className="relative">
+                      <input
+                        type="text"
+                        name="toLocation"
+                        placeholder="Enter Destination (e.g., Mumbai)"
+                        value={formik.values.toLocation}
+                        onChange={handleLocationChange}
+                        className="w-full bg-transparent outline-none mt-2"
+                      />
+                      {activeField === 'to' && suggestions.length > 0 ? (
+                        <ul className="absolute z-20 mt-2 max-h-44 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                          {suggestions.map((location) => (
+                            <li
+                              key={location}
+                              className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                              onClick={() => selectSuggestion(location)}
+                            >
+                              {location}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   </div>
 
                   {/* Date */}
@@ -126,7 +196,7 @@ export default function Home() {
           </main>
         </div>
 
-        <About />
+       
       </section>
     </>
   );

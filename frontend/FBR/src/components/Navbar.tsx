@@ -28,20 +28,20 @@ const Navbar = () => {
           <ul className="hidden md:flex items-center gap-8 text-lg">
 
               <li>
-                <a
-                  href="/"
+                <Link
+                  to="/"
                   className="hover:text-blue-500 transition duration-300"
                 >
                    Home
-                </a>
+                </Link>
               </li>
               <li>
-                <a
-                  href="#about"
+                <Link
+                  to="/about"
                   className="hover:text-blue-500 transition duration-300"
                 >
                   About
-                </a>
+                </Link>
               </li>
               <li>
                 <Link
@@ -113,13 +113,13 @@ const Navbar = () => {
                 </Link>
               </li>
               <li >
-                <a href="#about"
-                  
+                <Link
+                  to="/about"
                   className="block hover:text-blue-500"
                   onClick={() => setOpen(false)}
                 >
                   About
-                </a>
+                </Link>
               </li>
            <li >
                 <Link 
