@@ -12,8 +12,6 @@ var flightSchema = new mongoose.Schema({
     origin: { type: String, required: true, trim: true },
     destination: { type: String, required: true, trim: true },
     departureDate: { type: String, required: true, trim: true },
-    departureTime: { type: String, required: true, trim: true },
-    arrivalTime: { type: String, required: true, trim: true },
     duration: { type: String, required: true, trim: true },
     stops: { type: Number, default: 0 },
     price: { type: String, required: true, trim: true },

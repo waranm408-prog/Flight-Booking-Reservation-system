@@ -1,177 +1,173 @@
-I don't have write permissions to that repository. However, I can provide you with the complete README content that you can add yourself:
-
-```markdown
 # Flight Booking & Reservation System
 
-A full-stack web application for booking and managing flight reservations. This system provides both user and admin interfaces to search for flights, make bookings, process payments, and manage reservations.
+A full-stack web application for booking and managing flight reservations. The project includes a user-facing booking flow, an admin dashboard, secure authentication, payment integration, and live flight search functionality for travel planning.
 
-**Live Demo:** https://flight-booking-reservation-system.vercel.app
+## Project Overview
 
-## Stack
+This platform allows users to:
+- register and log in securely
+- search for flights by route, date, and time
+- view flight details and pricing
+- book seats and complete payments
+- view booking history and trip information
 
-- **Language(s):** JavaScript, TypeScript
-- **Framework / Runtime:** Express.js 4.16, Node.js
-- **Database:** MongoDB
-- **Frontend:** JavaScript (Express + Jade templates)
-- **Notable libraries:** 
-  - `jsonwebtoken` — JWT-based authentication for users and admins
-  - `bcryptjs` — Password hashing and encryption
-  - `razorpay` — Payment processing gateway
-  - `mongoose` — MongoDB object modeling
-  - `sib-api-v3-sdk` — Email notifications
-  - `cors` — Cross-origin resource sharing
+Admins can:
+- access a dashboard with booking and user statistics
+- review available flights
+- manage booking-related operations
+- monitor the overall system activity
 
-## How it's organized
+## Live Demo
 
+- Frontend: https://flight-booking-reservation-system-w.vercel.app
+
+## Tech Stack
+
+### Frontend
+- React + TypeScript
+- Vite
+- Tailwind CSS
+- Formik
+- React Router
+- Lucide Icons
+- Axios
+
+### Backend
+- Node.js
+- Express.js
+- MongoDB + Mongoose
+- JWT authentication
+- bcryptjs
+- Razorpay integration
+- Brevo / Sendinblue email support
+- CORS
+
+## Project Structure
+
+```text
+Flight Booking and Reservation System1/
+├── backend/
+│   ├── app.js
+│   ├── package.json
+│   ├── bin/
+│   ├── middleware/
+│   ├── Models/
+│   │   ├── Booking.js
+│   │   ├── Flight.js
+│   │   └── User.js
+│   ├── routes/
+│   │   ├── admin.js
+│   │   ├── bookings.js
+│   │   ├── flights.js
+│   │   ├── index.js
+│   │   ├── payments.js
+│   │   └── users.js
+│   ├── utils/
+│   ├── views/
+│   └── public/
+├── frontend/
+│   └── FBR/
+│       ├── src/
+│       │   ├── AdminPage/
+│       │   ├── Page/
+│       │   ├── api/
+│       │   ├── components/
+│       │   └── assets/
+│       ├── package.json
+│       ├── vite.config.ts
+│       └── tsconfig*.json
+├── package.json
+└── README
 ```
-backend/
-  app.js                 Express application setup, middleware configuration
-  package.json          Backend dependencies (Express, MongoDB, auth, payments)
-  Models/               Mongoose schemas (User, Flight, Booking, Payment)
-  routes/
-    users.js            Authentication endpoints (sign up, login, password reset)
-    flights.js          Flight search and admin flight management
-    bookings.js         Booking retrieval and admin status updates
-    payments.js         Payment processing with Razorpay
-    admin.js            Admin-only operations
-    index.js            Base routes
-  middleware/           Express middleware (authentication, validation)
-  utils/                Helper functions and utilities
-  views/                Jade templates for error pages and static content
-  public/               Static assets
 
-frontend/
-  FBR/                  Frontend React/JavaScript application
-  package.json          Frontend dependencies
-```
+## Main Features
 
-**Request Flow:**
-1. Client sends requests from the frontend to the backend API endpoints (`/flights`, `/bookings`, `/users`, etc.)
-2. Express middleware validates JWT tokens and applies CORS policies
-3. Routes authenticate users (regular users have role 'user', admins have role 'admin')
-4. Database queries execute via Mongoose models (Flight, Booking, User, Payment)
-5. Payments are processed through Razorpay integration for secure transactions
-6. Email notifications are sent via SendInBlue (sib-api-v3-sdk) for confirmations and updates
+- User registration and login
+- Password reset and authentication flow
+- Flight search with route, date, and time filters
+- Location suggestions in the search form
+- Flight result cards with price and route details
+- Seat selection and booking flow
+- Payment processing with Razorpay
+- Booking history and user profile view
+- Admin dashboard with statistics and flight overview
+- Email-based communication for booking-related updates
 
-## How to run it
+## Backend API Overview
+
+### Authentication
+- POST /users/signup
+- POST /users/login
+- POST /users/forgotpassword
+
+### Flights
+- GET /flights
+- GET /flights/search
+- GET /flights?from=...&to=...
+
+### Bookings
+- GET /bookings
+- POST /bookings
+- PUT /bookings/:id/status
+
+### Payments
+- POST /payments/create-order
+- POST /payments/verify-payment
+
+### Admin
+- GET /admin/stats
+- GET /admin/flights
+- GET /admin/users
+
+## Setup Instructions
 
 ### Prerequisites
-- Node.js (v14 or higher)
-- MongoDB instance (local or Atlas)
-- Razorpay API credentials
-- SendInBlue API key
+- Node.js 18+
+- MongoDB instance
+- Razorpay credentials
+- Brevo / SendInBlue API key
 
-### Setup
+### 1. Clone the repository
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/waranm408-prog/Flight-Booking-Reservation-system.git
-   cd Flight-Booking-Reservation-system
-   ```
+```bash
+git clone https://github.com/waranm408-prog/Flight-Booking-Reservation-system.git
+cd Flight-Booking-Reservation-system
+```
 
-2. **Backend setup:**
-   ```bash
-   cd backend
-   npm install
-   ```
+### 2. Backend setup
 
-   Create a `.env` file in the `backend/` directory:
-   ```
-   MONGO_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/<database>
-   JWT_SECRET=your_jwt_secret_key
-   CORS_ORIGIN=http://localhost:3000
-   RAZORPAY_KEY_ID=your_razorpay_key
-   RAZORPAY_KEY_SECRET=your_razorpay_secret
-   SENDINBLUE_API_KEY=your_sendinblue_api_key
-   ```
 
-   Start the backend:
-   ```bash
-   npm start
-   ```
-   The backend server will run on `http://localhost:3001` (or configured port).
+Create a `.env` file inside the backend folder:
 
-3. **Frontend setup:**
-   ```bash
-   cd frontend
-   npm install
-   npm start
-   ```
-   The frontend will run on `http://localhost:3000`.
+```env
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+CORS_ORIGIN=http://localhost:3000
+RAZORPAY_KEY_ID=your_razorpay_key_id
+RAZORPAY_KEY_SECRET=your_razorpay_secret
+BREVO_API_KEY=your_brevo_api_key
+FLIGHTAWARE_API_KEY=your_flightaware_api_key
+```
 
-### Test Credentials
 
-**Regular User:**
-- Email: `maheshsiva408@gmail.com`
-- Password: `mahesh@02`
 
-**Admin User:**
-- Email: `admin@gmail.com`
-- Password: `admin1234`
 
-### Sample Flight Routes
-The system includes pre-configured flight routes:
-- Coimbatore → Trichy
-- Delhi → Mumbai
-- Chennai → Bangalore
-- Singapore → Chennai
+## Demo Credentials
 
-## Features
+### User
+- Email: maheshsiva408@gmail.com
+- Password: mahesh@02
 
-- **User Authentication:** Sign up, login, JWT-based session management
-- **Flight Search:** Filter flights by origin and destination (case-insensitive regex search)
-- **Flight Booking:** Reserve flights with passenger details
-- **Payment Processing:** Secure payments via Razorpay integration
-- **Admin Dashboard:** Manage flights, view all bookings, update booking statuses
-- **Email Notifications:** Automated confirmations and updates via SendInBlue
-- **Security:** Password encryption with bcryptjs, JWT authentication, CORS protection
+### Admin
+- Email: admin@gmail.com
+- Password: admin1234
 
-## API Endpoints
+## Notes
 
-### Users (`/users`)
-- `POST /signup` — Create a new user account
-- `POST /login` — User login (returns JWT token)
-- `POST /forgotpassword` — Initiate password reset
-
-### Flights (`/flights`)
-- `GET /` — List all available flights
-- `GET /search?from=<origin>&to=<destination>` — Search flights
-- `POST /` (admin only) — Add a new flight
-
-### Bookings (`/bookings`)
-- `GET /?email=<email>` (authenticated) — Retrieve user's bookings
-- `PUT /:id/status` (admin only) — Update booking status
-
-### Payments (`/payments`)
-- `POST /create-order` (authenticated) — Create Razorpay payment order
-- `POST /verify-payment` (authenticated) — Verify payment and confirm booking
-
-### Admin (`/admin`)
-- Admin-specific endpoints for managing flights and bookings
-
-## Try asking
-
-- "How do I add a new flight to the system as an admin?"
-- "What happens when a user completes a payment for a booking?"
-- "How are bookings filtered and retrieved for users vs. admins?"
+- The app uses a live flight lookup flow and can fall back gracefully when the external data source is unavailable.
+- The admin panel provides a dashboard for monitoring bookings and flight information.
+- The app is designed for educational and demonstration purposes and may require valid environment variables for full functionality.
 
 ## License
 
 This project is open source and available under the MIT License.
-```
-
-To add this README to your repository, you can:
-
-1. **Via GitHub Web UI:**
-   - Go to your repository on GitHub
-   - Click "Add file" → "Create new file"
-   - Name it `README.md`
-   - Paste the content above
-   - Commit with message "Add comprehensive README"
-
-2. **Via Git CLI:**
-   - Create the file locally: `echo "..." > README.md`
-   - Stage and commit: `git add README.md && git commit -m "Add comprehensive README"`
-   - Push: `git push origin main`
-
-The README provides a complete overview of your flight booking system, including stack information, project organization, setup instructions, and API documentation.

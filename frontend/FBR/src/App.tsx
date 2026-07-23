@@ -12,6 +12,7 @@ import Seat from './Page/Seat';
 import BookNow from './Page/BookNow';
 import UserDetails from './components/UserDetails';
 import Bookinghistory from './Page/Bookinghistory';
+import BookingConfirmation from './Page/BookingConfirmation';
 import ForgotPassword from './components/ForgotPassword';
 import AdminSidebar from './AdminPage/AdminSidebar';
 import AdminDashboard from './AdminPage/AdminDashboard';
@@ -37,6 +38,7 @@ function App() {
          <Route path="/book-now" element={<BookNow />} />
          <Route path="/user-details" element={<UserDetails />} />
          <Route path="/booking-history" element={<Bookinghistory />} />
+         <Route path="/booking-confirmation" element={<BookingConfirmation />} />
          <Route path="/forgot-password" element={<ForgotPassword />} />
          <Route path="/admin/*" element={<AdminSidebar />}>
            <Route index element={<AdminDashboard/>} />

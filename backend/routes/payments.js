@@ -82,6 +82,32 @@ function normalizePassengers(passengers, fallbackEmail = '') {
     .filter((passenger) => passenger.name || passenger.phone || passenger.email);
 }
 
+function normalizeSeats(seats) {
+  if (!Array.isArray(seats)) return [];
+  return [...new Set(seats.map((seat) => seat.toString().trim().toUpperCase()).filter(Boolean))];
+}
+
+router.get('/seats/:flightId', async function (req, res) {
+  try {
+    const flightId = (req.params.flightId || '').toString().trim();
+    if (!flightId) {
+      return res.status(400).json({ message: 'A flight ID is required.' });
+    }
+
+    const bookings = await Booking.find({
+      flightId,
+      status: 'confirmed',
+      seats: { $exists: true, $ne: [] },
+    }).select('seats -_id');
+
+    const bookedSeats = [...new Set(bookings.flatMap((booking) => normalizeSeats(booking.seats)))];
+    return res.json({ flightId, bookedSeats });
+  } catch (error) {
+    console.error('Failed to load seat availability:', error);
+    return res.status(500).json({ message: 'Unable to load seat availability.' });
+  }
+});
+
 async function sendBookingConfirmationEmail(recipientEmail, bookingData, paymentId, orderId) {
   if (!recipientEmail) {
     console.warn('No recipient email provided for booking confirmation.');
@@ -160,6 +186,7 @@ router.post('/create-order', async function (req, res) {
 router.post('/verify', async function (req, res) {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingData } = req.body;
+    let savedBooking = null;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ message: 'Payment verification payload is incomplete.' });
@@ -187,13 +214,35 @@ router.post('/verify', async function (req, res) {
       return res.status(400).json({ success: false, message: 'Invalid payment signature.' });
     }
 
+    const existingBooking = await Booking.findOne({ paymentId: razorpay_payment_id });
+    if (existingBooking) {
+      return res.json({
+        success: true,
+        message: 'Payment was already verified.',
+        payment: { razorpay_order_id, razorpay_payment_id },
+        booking: { id: existingBooking._id },
+        alreadyProcessed: true,
+      });
+    }
+
     if (bookingData) {
       const normalizedPassengers = normalizePassengers(bookingData.passengers, bookingData.userEmail || '');
       const userEmail = (bookingData.userEmail || '').toString().trim() || normalizedPassengers[0]?.email || '';
+      const flightId = (bookingData.flightId || '').toString().trim();
+      const seats = normalizeSeats(bookingData.seats);
+
+      if (!flightId) {
+        return res.status(400).json({ success: false, message: 'Flight identity is required for seat booking.' });
+      }
+
+      if (seats.length !== normalizedPassengers.length) {
+        return res.status(400).json({ success: false, message: 'Select one seat for each passenger.' });
+      }
 
       const booking = new Booking({
         userId: bookingData.userId || null,
         userEmail,
+        flightId,
         flightName: bookingData.flightName || '',
         origin: bookingData.origin || '',
         destination: bookingData.destination || '',
@@ -201,14 +250,22 @@ router.post('/verify', async function (req, res) {
         arrivalTime: bookingData.arrivalTime || '',
         cabinClass: bookingData.cabinClass || 'Economy',
         passengers: normalizedPassengers,
-        seats: bookingData.seats || [],
+        seats,
         amount: bookingData.amount || 0,
         paymentId: razorpay_payment_id,
         orderId: razorpay_order_id,
         status: 'confirmed',
       });
 
-      await booking.save();
+      try {
+        await booking.save();
+      } catch (saveError) {
+        if (saveError?.code === 11000) {
+          return res.status(409).json({ success: false, message: 'One or more selected seats were just booked. Please choose different seats.' });
+        }
+        throw saveError;
+      }
+      savedBooking = booking;
 
       try {
         if (process.env.BREVO_API_KEY && process.env.EMAIL_FROM) {
@@ -223,6 +280,7 @@ router.post('/verify', async function (req, res) {
       success: true,
       message: 'Payment verified successfully.',
       payment: { razorpay_order_id, razorpay_payment_id },
+      booking: savedBooking ? { id: savedBooking._id } : null,
     });
   } catch (error) {
     console.error('Payment verification failed:', error);

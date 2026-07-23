@@ -1,17 +1,16 @@
 import { useMemo, useState, useEffect } from "react";
 import { useFormik } from "formik";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plane, Armchair, UserRound, CreditCard, Phone, Mail, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Plane, Armchair, UserRound, CreditCard, Phone, Mail } from "lucide-react";
 import Navbar from "../components/Navbar";
 import RazorpayCheckout from "../components/RazorpayCheckout";
 import api from "../api/axios";
 
 interface FlightSummary {
+  id: number | string;
   airline: string;
   origin: string;
   destination: string;
-  departureTime: string;
-  arrivalTime: string;
   price: string;
   cabinClass: string;
 }
@@ -54,6 +53,7 @@ function BookNow() {
   const passengers = state?.passengers ?? 1;
   const selectedSeats = state?.selectedSeats ?? [];
   const trip = state?.trip;
+  const paymentKey = `flightPayment:${flight?.id || 'unknown'}:${selectedSeats.slice().sort().join('-')}`;
 
   const passengerCount = Math.max(1, Math.min(6, passengers));
   const passengerLabels = useMemo(() => Array.from({ length: passengerCount }, (_, index) => index + 1), [passengerCount]);
@@ -61,9 +61,15 @@ function BookNow() {
   const totalPrice = basePrice * passengerCount;
   const hasSelectedFlight = Boolean(flight?.airline);
   const [isPaying, setIsPaying] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<{ name?: string; email?: string } | null>(null);
+
+  useEffect(() => {
+    const completedPayment = sessionStorage.getItem(paymentKey);
+    if (completedPayment) {
+      navigate('/booking-confirmation', { state: JSON.parse(completedPayment), replace: true });
+    }
+  }, [navigate, paymentKey]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem('CurrentUser');
@@ -132,7 +138,6 @@ function BookNow() {
       }
 
       setIsPaying(true);
-      setPaymentSuccess(false);
       setPaymentError(null);
     },
   });
@@ -151,12 +156,11 @@ function BookNow() {
         ...payment,
         bookingData: {
           userId: currentUser?._id || null,
+          flightId: flight?.id || '',
           userEmail,
           flightName: flight?.airline || 'Flight',
           origin: trip?.from || flight?.origin || 'Origin',
           destination: trip?.to || flight?.destination || 'Destination',
-          departureTime: flight?.departureTime || '',
-          arrivalTime: flight?.arrivalTime || '',
           cabinClass: flight?.cabinClass || trip?.cabinClass || 'Economy',
           passengers: formik.values.travelers,
           seats: selectedSeats,
@@ -177,11 +181,23 @@ function BookNow() {
 
         localStorage.setItem(storageKey, JSON.stringify([newNotification, ...notifications].slice(0, 6)));
         window.dispatchEvent(new Event('notifications-updated'));
-        setPaymentSuccess(true);
+        const confirmation = {
+          bookingId: verification.data.booking?.id || verification.data.booking?._id || payment.razorpay_payment_id,
+          paymentId: payment.razorpay_payment_id,
+          orderId: payment.razorpay_order_id,
+          flight,
+          trip,
+          passengers: passengerCount,
+          selectedSeats,
+          amount: totalPrice,
+        };
+        sessionStorage.setItem(paymentKey, JSON.stringify(confirmation));
+        navigate('/booking-confirmation', { state: confirmation, replace: true });
         setPaymentError(null);
       }
     } catch (error) {
-      setPaymentError('Payment verification failed. Please contact support.');
+      const responseMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setPaymentError(responseMessage || 'Payment verification failed. Please contact support.');
       console.error(error);
     } finally {
       setIsPaying(false);
@@ -227,7 +243,6 @@ function BookNow() {
                       <Plane size={18} className="text-blue-600" />
                       <div>
                         <p className="text-sm font-semibold text-slate-700">{trip?.from || flight?.origin || "Origin"} → {trip?.to || flight?.destination || "Destination"}</p>
-                        <p className="text-sm text-slate-500">{flight?.departureTime || "Departure"} • {flight?.arrivalTime || "Arrival"}</p>
                       </div>
                     </div>
                   </>
@@ -348,13 +363,6 @@ function BookNow() {
                 <CreditCard size={16} />
                 {isPaying ? "Preparing payment..." : "Continue to Payment"}
               </button>
-
-              {paymentSuccess && (
-                <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                  <CheckCircle2 size={18} />
-                  Payment verified successfully.
-                </div>
-              )}
 
               {paymentError && (
                 <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">

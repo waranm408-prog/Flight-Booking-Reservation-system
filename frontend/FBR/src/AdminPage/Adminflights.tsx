@@ -9,8 +9,6 @@ type Flight = {
   origin: string;
   destination: string;
   departureDate?: string;
-  departureTime: string;
-  arrivalTime: string;
   duration: string;
   stops: number;
   price: string;
@@ -87,7 +85,6 @@ export default function AdminFlights() {
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-500">
-                    <span>{flight.departureTime} → {flight.arrivalTime}</span>
                     <span>{flight.duration}</span>
                     <span>{flight.stops} stop(s)</span>
                     {typeof flight.seatsAvailable === 'number' ? <span>{flight.seatsAvailable} seats</span> : null}

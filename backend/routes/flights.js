@@ -86,41 +86,6 @@ function getAirportCode(value) {
   return '';
 }
 
-function formatTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-}
-
-function parseTimeToMinutes(value) {
-  if (!value) return null;
-  const text = value.toString().trim();
-  if (!text) return null;
-
-  const meridiemMatch = text.match(/^(\d{1,2}):(\d{2})\s*([AP]M)$/i);
-  if (meridiemMatch) {
-    let hours = Number(meridiemMatch[1]);
-    const minutes = Number(meridiemMatch[2]);
-    const meridiem = meridiemMatch[3].toUpperCase();
-
-    if (hours === 12) hours = 0;
-    if (meridiem === 'PM' && hours < 12) hours += 12;
-    if (meridiem === 'AM' && hours === 12) hours = 0;
-
-    if (minutes < 0 || minutes > 59 || hours < 0 || hours > 23) return null;
-    return hours * 60 + minutes;
-  }
-
-  const timeMatch = text.match(/^(\d{1,2}):(\d{2})$/);
-  if (!timeMatch) return null;
-
-  const hours = Number(timeMatch[1]);
-  const minutes = Number(timeMatch[2]);
-  if (minutes < 0 || minutes > 59 || hours < 0 || hours > 23) return null;
-  return hours * 60 + minutes;
-}
-
 function buildPrice(originCode, destinationCode, cabinClass) {
   const base = (originCode.charCodeAt(0) + destinationCode.charCodeAt(0) + originCode.charCodeAt(1) + destinationCode.charCodeAt(1)) % 7000 + 8000;
   if (cabinClass === 'Business') return `₹${(base * 1.65).toFixed(0)}`;
@@ -128,7 +93,7 @@ function buildPrice(originCode, destinationCode, cabinClass) {
   return `₹${base}`;
 }
 
-function buildFallbackFlights(origin, destination, cabinClass, departureDate, departureTime) {
+function buildFallbackFlights(origin, destination, cabinClass, departureDate) {
   const originCode = getAirportCode(origin) || 'MAA';
   const destinationCode = getAirportCode(destination) || 'BLR';
   const price = buildPrice(originCode, destinationCode, cabinClass);
@@ -137,38 +102,17 @@ function buildFallbackFlights(origin, destination, cabinClass, departureDate, de
     baseDate.setTime(Date.now());
   }
 
-  const selectedMinutes = parseTimeToMinutes(departureTime);
-
-  const formatDateTime = (hours, minutes) => {
-    const date = new Date(baseDate);
-    date.setHours(hours, minutes, 0, 0);
-    return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-  };
-
   const fallbackSchedules = [
     { hours: 8, minutes: 30 },
     { hours: 12, minutes: 15 },
     { hours: 18, minutes: 50 },
   ];
 
-  if (selectedMinutes !== null) {
-    fallbackSchedules.unshift({ hours: Math.floor(selectedMinutes / 60), minutes: selectedMinutes % 60 });
-    fallbackSchedules.push({ hours: Math.min(23, Math.floor(selectedMinutes / 60) + 2), minutes: selectedMinutes % 60 });
-  }
-
   const flights = fallbackSchedules.map((schedule, index) => {
-    const departureDateTime = new Date(baseDate);
-    departureDateTime.setHours(schedule.hours, schedule.minutes, 0, 0);
-
-    const arrivalDateTime = new Date(departureDateTime);
-    arrivalDateTime.setHours(arrivalDateTime.getHours() + 1, arrivalDateTime.getMinutes() + 40, 0, 0);
-
     return {
       id: `fallback-${index + 1}`,
       airline: index === 0 ? 'SkyJet' : index === 1 ? 'BlueAir' : 'AeroLink',
       logo: '',
-      departureTime: departureDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      arrivalTime: arrivalDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
       duration: index === 0 ? '1h 40m' : index === 1 ? '1h 50m' : '1h 45m',
       stops: index === 1 ? 1 : 0,
       price: index === 0 ? price : index === 1 ? `₹${Number(price.replace(/[^0-9]/g, '')) + 1200}` : `₹${Number(price.replace(/[^0-9]/g, '')) + 1800}`,
@@ -179,27 +123,15 @@ function buildFallbackFlights(origin, destination, cabinClass, departureDate, de
     };
   });
 
-  if (selectedMinutes === null) {
-    return flights;
-  }
-
-  return flights.filter((flight) => {
-    const departureMinutes = parseTimeToMinutes(flight.departureTime);
-    return departureMinutes !== null && selectedMinutes !== null && departureMinutes >= selectedMinutes;
-  });
+  return flights;
 }
 
 function mapFlightAwareFlight(item, originCode, destinationCode, cabinClass) {
   const airlineName = item.airline || item.airlineName || item.airline_name || item.operator || item.operatorName || 'FlightAware';
-  const departure = item.scheduled_out || item.actual_departure || item.departureTime || item.departure_time || item.departure || '';
-  const arrival = item.scheduled_in || item.actual_arrival || item.arrivalTime || item.arrival_time || item.arrival || '';
-
   return {
     id: item.ident || item.flightNumber || item.flight_number || item.faFlightID || `${originCode}-${destinationCode}-${Math.random().toString(36).slice(2, 8)}`,
     airline: airlineName,
     logo: '',
-    departureTime: formatTime(departure),
-    arrivalTime: formatTime(arrival),
     duration: item.duration || item.estimated_duration || item.flight_duration || 'N/A',
     stops: item.stops || 0,
     price: item.price || buildPrice(originCode, destinationCode, cabinClass),
@@ -210,16 +142,16 @@ function mapFlightAwareFlight(item, originCode, destinationCode, cabinClass) {
   };
 }
 
-async function fetchLiveFlights(from, to, cabinClass, departureDate, departureTime, useFallback = true) {
+async function fetchLiveFlights(from, to, cabinClass, departureDate, useFallback = true) {
   const originCode = getAirportCode(from);
   const destinationCode = getAirportCode(to);
 
   if (!originCode) {
-    return useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate, departureTime) : [];
+    return useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate) : [];
   }
 
   if (!FLIGHTAWARE_API_KEY) {
-    return useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate, departureTime) : [];
+    return useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate) : [];
   }
 
   try {
@@ -251,18 +183,10 @@ async function fetchLiveFlights(from, to, cabinClass, departureDate, departureTi
       .slice(0, 10)
       .map((item) => mapFlightAwareFlight(item, originCode, destinationCode || 'N/A', cabinClass));
 
-    if (departureTime) {
-      const selectedMinutes = parseTimeToMinutes(departureTime);
-      flights = flights.filter((flight) => {
-        const flightMinutes = parseTimeToMinutes(flight.departureTime);
-        return flightMinutes !== null && selectedMinutes !== null && flightMinutes >= selectedMinutes;
-      });
-    }
-
-    return flights.length > 0 ? flights : (useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate, departureTime) : []);
+    return flights.length > 0 ? flights : (useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate) : []);
   } catch (error) {
     console.error('FlightAware request failed, using fallback flights:', error.message);
-    return useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate, departureTime) : [];
+    return useFallback ? buildFallbackFlights(from, to, cabinClass, departureDate) : [];
   }
 }
 
@@ -272,8 +196,7 @@ router.get('/', async function (req, res) {
     const to = (req.query.to || 'bangalore').toString().trim();
     const cabinClass = (req.query.cabinClass || 'Economy').toString().trim();
     const departureDate = (req.query.departureDate || '').toString().trim();
-    const departureTime = (req.query.departureTime || '').toString().trim();
-    const flights = await fetchLiveFlights(from, to, cabinClass, departureDate, departureTime);
+    const flights = await fetchLiveFlights(from, to, cabinClass, departureDate);
     res.json({ flights });
   } catch (error) {
     console.error('Failed to fetch live flights:', error);
@@ -291,8 +214,7 @@ router.get('/search', async function (req, res) {
     const to = (req.query.to || '').toString().trim();
     const cabinClass = (req.query.cabinClass || 'Economy').toString().trim();
     const departureDate = (req.query.departureDate || '').toString().trim();
-    const departureTime = (req.query.departureTime || '').toString().trim();
-    const flights = await fetchLiveFlights(from, to, cabinClass, departureDate, departureTime);
+    const flights = await fetchLiveFlights(from, to, cabinClass, departureDate);
     res.json({ flights });
   } catch (error) {
     console.error('Search flights failed:', error);

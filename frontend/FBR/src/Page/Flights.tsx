@@ -10,8 +10,6 @@ interface Flights {
   id: number | string;
   airline: string;
   logo: string;
-  departureTime: string;
-  arrivalTime: string;
   duration: string;
   stops: number;
   price: string;
@@ -48,7 +46,6 @@ function Flights() {
       fromLocation: searchParams.get('from') || "",
       toLocation: searchParams.get('to') || "",
       departureDate: searchParams.get('departureDate') || "",
-      departureTime: searchParams.get('departureTime') || "",
       returnDate: "",
       passengers: "1",
       cabinClass: "Economy",
@@ -77,7 +74,6 @@ function Flights() {
             from: values.fromLocation,
             to: values.toLocation,
             departureDate: values.departureDate,
-            departureTime: values.departureTime,
             cabinClass: values.cabinClass,
           },
         });
@@ -85,9 +81,7 @@ function Flights() {
         const fetchedFlights: Flights[] = response.data?.flights || [];
         if (fetchedFlights.length === 0) {
           setFlights([]);
-          setError(values.departureTime
-            ? "No flights are available at or after the selected departure time. Try a later time or another route."
-            : "No flights found for the selected route.");
+          setError("No flights found for the selected route.");
         } else {
           setFlights(fetchedFlights);
           setError("");
@@ -170,7 +164,6 @@ function Flights() {
         fromLocation: from,
         toLocation: to,
         departureDate,
-        departureTime: searchParams.get('departureTime') || '',
         returnDate: '',
         passengers: formik.values.passengers,
         cabinClass: formik.values.cabinClass,
@@ -285,21 +278,7 @@ function Flights() {
               />
             </div>
 
-            {/* Time */}
-            <div className="p-3 bg-slate-50 rounded-xl border border-transparent focus-within:border-blue-500 transition-all">
-              <label className="text-xs text-slate-500 font-semibold flex items-center gap-1 mb-1">
-                <Clock size={14} className="text-slate-400" />
-                Time
-              </label>
-              <input
-                type="time"
-                name="departureTime"
-                value={formik.values.departureTime}
-                onChange={formik.handleChange}
-                className="w-full bg-transparent outline-none text-sm font-medium text-slate-700"
-                 required
-              />
-            </div>
+            
 
             {/* Return */}
             <div className="p-3 bg-slate-50 rounded-xl border border-transparent focus-within:border-blue-500 transition-all">
@@ -399,13 +378,8 @@ function Flights() {
                     </div>
                   </div>
 
-                  {/* Timeline */}
+                  {/* Flight details */}
                   <div className="flex items-center justify-between md:justify-center gap-6 w-full md:w-2/4">
-                    <div className="text-right">
-                      <p className="text-base font-bold text-slate-800">{flight.departureTime}</p>
-                      <p className="text-xs text-slate-400 font-medium">{flight.origin}</p>
-                    </div>
-
                     <div className="flex flex-col items-center flex-1 max-w-[150px]">
                       <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
                         <Clock size={12} /> {flight.duration}
@@ -422,10 +396,6 @@ function Flights() {
                       </span>
                     </div>
 
-                    <div className="text-left">
-                      <p className="text-base font-bold text-slate-800">{flight.arrivalTime}</p>
-                      <p className="text-xs text-slate-400 font-medium">{flight.destination}</p>
-                    </div>
                   </div>
 
                   {/* Pricing and Action Button */}

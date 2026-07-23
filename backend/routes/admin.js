@@ -35,7 +35,7 @@ router.get('/flights', authenticateAdmin, async function (req, res) {
     const requestedDate = (req.query.date || req.query.departureDate || 'today').toString().trim();
     const targetDate = requestedDate.toLowerCase() === 'today' ? getTodayDateString() : requestedDate;
 
-    const flights = await fetchLiveFlights('chennai', 'bangalore', 'Economy', targetDate, '', false);
+    const flights = await fetchLiveFlights('chennai', 'bangalore', 'Economy', targetDate, false);
 
     const formattedFlights = (flights || []).map((flight) => ({
       id: flight.id,
@@ -44,8 +44,6 @@ router.get('/flights', authenticateAdmin, async function (req, res) {
       origin: flight.origin,
       destination: flight.destination,
       departureDate: targetDate || getTodayDateString(),
-      departureTime: flight.departureTime,
-      arrivalTime: flight.arrivalTime,
       duration: flight.duration,
       stops: flight.stops || 0,
       price: flight.price,

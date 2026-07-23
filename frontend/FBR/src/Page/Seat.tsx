@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Armchair, CheckCircle2 } from "lucide-react";
 import Navbar from "../components/Navbar";
+import api from "../api/axios";
 
 interface FlightSummary {
+  id: number | string;
   airline: string;
   origin: string;
   destination: string;
-  departureTime: string;
-  arrivalTime: string;
   price: string;
   cabinClass: string;
 }
@@ -55,6 +55,47 @@ function Seat() {
   );
 
   const [selectedSeats, setSelectedSeats] = useState<string[]>(storedSelection?.selectedSeats ?? []);
+  const [bookedSeats, setBookedSeats] = useState<string[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAvailability = async () => {
+      if (!flight?.id) {
+        setAvailabilityLoading(false);
+        setAvailabilityError("This flight is missing its identity. Please return to search and choose it again.");
+        return;
+      }
+
+      setAvailabilityLoading(true);
+      setAvailabilityError("");
+
+      try {
+        const response = await api.get(`/payments/seats/${encodeURIComponent(String(flight.id))}`);
+        if (!active) return;
+
+        const liveBookedSeats = Array.isArray(response.data?.bookedSeats)
+          ? response.data.bookedSeats.map((seat: string) => seat.toUpperCase())
+          : [];
+        setBookedSeats(liveBookedSeats);
+        setSelectedSeats((currentSeats) => currentSeats.filter((seat) => !liveBookedSeats.includes(seat)));
+      } catch (error) {
+        console.error("Seat availability error:", error);
+        if (active) {
+          setAvailabilityError("Unable to load live seat availability. Please try again.");
+        }
+      } finally {
+        if (active) setAvailabilityLoading(false);
+      }
+    };
+
+    void loadAvailability();
+    return () => {
+      active = false;
+    };
+  }, [flight?.id]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -66,6 +107,10 @@ function Seat() {
   }, [flight, passengers, trip, selectedSeats, storageKey]);
 
   const toggleSeat = (seat: string) => {
+    if (bookedSeats.includes(seat)) {
+      return;
+    }
+
     if (selectedSeats.includes(seat)) {
       setSelectedSeats(selectedSeats.filter((item) => item !== seat));
       return;
@@ -129,7 +174,7 @@ function Seat() {
                   </span>
                 </div>
                 <div className="text-sm text-slate-600">
-                  {flight?.airline || "Premium flight"} • {flight?.departureTime || "Departure"} → {flight?.arrivalTime || "Arrival"}
+                  {flight?.airline || "Premium flight"}
                 </div>
               </div>
 
@@ -151,7 +196,8 @@ function Seat() {
                 <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
                   {seatOptions.map((seat) => {
                     const isSelected = selectedSeats.includes(seat);
-                    const isDisabled = !isSelected && selectedSeats.length >= passengers;
+                    const isBooked = bookedSeats.includes(seat);
+                    const isDisabled = isBooked || (!isSelected && selectedSeats.length >= passengers);
 
                     return (
                       <button
@@ -162,7 +208,9 @@ function Seat() {
                         className={`flex items-center justify-center rounded-2xl border px-3 py-3 text-sm font-semibold transition ${
                           isSelected
                             ? "border-blue-600 bg-blue-600 text-white"
-                            : "border-slate-300 bg-white text-slate-700 hover:border-blue-400 hover:text-blue-600"
+                            : isBooked
+                              ? "cursor-not-allowed border-slate-300 bg-slate-200 text-slate-400"
+                              : "border-slate-300 bg-white text-slate-700 hover:border-blue-400 hover:text-blue-600"
                         } ${isDisabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}
                       >
                         <span className="mr-2">
@@ -174,6 +222,14 @@ function Seat() {
                   })}
                 </div>
               </div>
+              {availabilityLoading ? (
+                <p className="mt-3 text-center text-sm text-slate-500">Loading live seat availability...</p>
+              ) : null}
+              {availabilityError ? (
+                <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-center text-sm text-rose-700">
+                  {availabilityError}
+                </p>
+              ) : null}
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -215,7 +271,7 @@ function Seat() {
 
               <button
                 type="button"
-                disabled={selectedSeats.length !== passengers}
+                disabled={availabilityLoading || Boolean(availabilityError) || selectedSeats.length !== passengers}
                 onClick={handleContinue}
                 className="mt-6 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
