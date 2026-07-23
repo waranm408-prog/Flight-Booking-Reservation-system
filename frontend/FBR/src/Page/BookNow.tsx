@@ -11,6 +11,8 @@ interface FlightSummary {
   airline: string;
   origin: string;
   destination: string;
+  departureTime: string;
+  arrivalTime: string;
   price: string;
   cabinClass: string;
 }
@@ -161,6 +163,8 @@ function BookNow() {
           flightName: flight?.airline || 'Flight',
           origin: trip?.from || flight?.origin || 'Origin',
           destination: trip?.to || flight?.destination || 'Destination',
+          departureTime: flight?.departureTime || '',
+          arrivalTime: flight?.arrivalTime || '',
           cabinClass: flight?.cabinClass || trip?.cabinClass || 'Economy',
           passengers: formik.values.travelers,
           seats: selectedSeats,

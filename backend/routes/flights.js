@@ -86,6 +86,21 @@ function getAirportCode(value) {
   return '';
 }
 
+function formatTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.toString();
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
+function addDurationToTime(hours, minutes, duration) {
+  const durationMatch = String(duration || '').match(/(?:(\d+)h)?\s*(?:(\d+)m)?/i);
+  const durationHours = Number(durationMatch?.[1] || 0);
+  const durationMinutes = Number(durationMatch?.[2] || 0);
+  const date = new Date(2000, 0, 1, hours, minutes + durationHours * 60 + durationMinutes);
+  return date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+}
+
 function buildPrice(originCode, destinationCode, cabinClass) {
   const base = (originCode.charCodeAt(0) + destinationCode.charCodeAt(0) + originCode.charCodeAt(1) + destinationCode.charCodeAt(1)) % 7000 + 8000;
   if (cabinClass === 'Business') return `₹${(base * 1.65).toFixed(0)}`;
@@ -109,11 +124,14 @@ function buildFallbackFlights(origin, destination, cabinClass, departureDate) {
   ];
 
   const flights = fallbackSchedules.map((schedule, index) => {
+    const duration = index === 0 ? '1h 40m' : index === 1 ? '1h 50m' : '1h 45m';
     return {
       id: `fallback-${index + 1}`,
       airline: index === 0 ? 'SkyJet' : index === 1 ? 'BlueAir' : 'AeroLink',
       logo: '',
-      duration: index === 0 ? '1h 40m' : index === 1 ? '1h 50m' : '1h 45m',
+      departureTime: new Date(2000, 0, 1, schedule.hours, schedule.minutes).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      arrivalTime: addDurationToTime(schedule.hours, schedule.minutes, duration),
+      duration,
       stops: index === 1 ? 1 : 0,
       price: index === 0 ? price : index === 1 ? `₹${Number(price.replace(/[^0-9]/g, '')) + 1200}` : `₹${Number(price.replace(/[^0-9]/g, '')) + 1800}`,
       cabinClass,
@@ -128,11 +146,16 @@ function buildFallbackFlights(origin, destination, cabinClass, departureDate) {
 
 function mapFlightAwareFlight(item, originCode, destinationCode, cabinClass) {
   const airlineName = item.airline || item.airlineName || item.airline_name || item.operator || item.operatorName || 'FlightAware';
+  const departure = item.scheduled_out || item.actual_departure || item.departureTime || item.departure_time || item.departure || '';
+  const arrival = item.scheduled_in || item.actual_arrival || item.arrivalTime || item.arrival_time || item.arrival || '';
+  const duration = item.duration || item.estimated_duration || item.flight_duration || 'N/A';
   return {
     id: item.ident || item.flightNumber || item.flight_number || item.faFlightID || `${originCode}-${destinationCode}-${Math.random().toString(36).slice(2, 8)}`,
     airline: airlineName,
     logo: '',
-    duration: item.duration || item.estimated_duration || item.flight_duration || 'N/A',
+    departureTime: formatTime(departure),
+    arrivalTime: formatTime(arrival),
+    duration,
     stops: item.stops || 0,
     price: item.price || buildPrice(originCode, destinationCode, cabinClass),
     cabinClass: cabinClass || 'Economy',

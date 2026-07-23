@@ -30,12 +30,38 @@ function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
+function getTodayRange() {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start, end };
+}
+
 router.get('/flights', authenticateAdmin, async function (req, res) {
   try {
     const requestedDate = (req.query.date || req.query.departureDate || 'today').toString().trim();
     const targetDate = requestedDate.toLowerCase() === 'today' ? getTodayDateString() : requestedDate;
 
-    const flights = await fetchLiveFlights('chennai', 'bangalore', 'Economy', targetDate, false);
+    const flights = await fetchLiveFlights('chennai', 'bangalore', 'Economy', targetDate);
+    const { start, end } = getTodayRange();
+    const todayBookings = await Booking.find({
+      createdAt: { $gte: start, $lt: end },
+    }).select('flightId flightName origin destination userEmail passengers seats amount status createdAt');
+
+    const formattedBookings = todayBookings.map((booking) => ({
+      id: booking._id,
+      flightId: booking.flightId || '',
+      flightName: booking.flightName,
+      origin: booking.origin,
+      destination: booking.destination,
+      userEmail: booking.userEmail,
+      passengers: booking.passengers,
+      seats: booking.seats,
+      amount: booking.amount,
+      status: booking.status,
+      createdAt: booking.createdAt,
+    }));
 
     const formattedFlights = (flights || []).map((flight) => ({
       id: flight.id,
@@ -44,14 +70,32 @@ router.get('/flights', authenticateAdmin, async function (req, res) {
       origin: flight.origin,
       destination: flight.destination,
       departureDate: targetDate || getTodayDateString(),
+      departureTime: flight.departureTime || '',
+      arrivalTime: flight.arrivalTime || '',
       duration: flight.duration,
       stops: flight.stops || 0,
       price: flight.price,
       cabinClass: flight.cabinClass || 'Economy',
       seatsAvailable: flight.seatsAvailable || 0,
+      bookings: todayBookings
+        .filter((booking) => {
+          if (booking.flightId) return String(booking.flightId) === String(flight.id);
+          return booking.flightName === flight.airline
+            && booking.origin === flight.origin
+            && booking.destination === flight.destination;
+        })
+        .map((booking) => ({
+          id: booking._id,
+          userEmail: booking.userEmail,
+          passengers: booking.passengers,
+          seats: booking.seats,
+          amount: booking.amount,
+          status: booking.status,
+          createdAt: booking.createdAt,
+        })),
     }));
 
-    return res.json({ flights: formattedFlights });
+    return res.json({ flights: formattedFlights, bookings: formattedBookings, bookingDate: getTodayDateString() });
   } catch (error) {
     console.error('Failed to load admin flights:', error);
     res.status(500).json({ message: 'Failed to load today’s flights.' });

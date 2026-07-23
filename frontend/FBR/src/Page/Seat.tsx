@@ -9,6 +9,8 @@ interface FlightSummary {
   airline: string;
   origin: string;
   destination: string;
+  departureTime: string;
+  arrivalTime: string;
   price: string;
   cabinClass: string;
 }

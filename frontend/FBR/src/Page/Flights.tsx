@@ -10,6 +10,8 @@ interface Flights {
   id: number | string;
   airline: string;
   logo: string;
+  departureTime: string;
+  arrivalTime: string;
   duration: string;
   stops: number;
   price: string;
@@ -380,6 +382,11 @@ function Flights() {
 
                   {/* Flight details */}
                   <div className="flex items-center justify-between md:justify-center gap-6 w-full md:w-2/4">
+                    <div className="text-right">
+                      <p className="text-base font-bold text-slate-800">{flight.departureTime || "--:--"}</p>
+                      <p className="text-xs text-slate-400 font-medium">{flight.origin}</p>
+                    </div>
+
                     <div className="flex flex-col items-center flex-1 max-w-[150px]">
                       <span className="text-xs text-slate-400 font-medium flex items-center gap-1">
                         <Clock size={12} /> {flight.duration}
@@ -394,6 +401,11 @@ function Flights() {
                       <span className="text-xs font-semibold text-slate-500">
                         {flight.stops === 0 ? "Non-stop" : `${flight.stops} Stop`}
                       </span>
+                    </div>
+
+                    <div className="text-left">
+                      <p className="text-base font-bold text-slate-800">{flight.arrivalTime || "--:--"}</p>
+                      <p className="text-xs text-slate-400 font-medium">{flight.destination}</p>
                     </div>
 
                   </div>
