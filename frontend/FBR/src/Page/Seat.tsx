@@ -56,21 +56,25 @@ function Seat() {
     }
   }, []);
 
+  const trip = state?.trip ?? storedSelection?.trip;
+  const isRoundTrip = trip?.tripType === 'round-trip';
   const rawFlight = state?.flight ?? storedSelection?.flight;
-  const rawReturnFlight = state?.returnFlight ?? storedSelection?.returnFlight;
+  const rawReturnFlight = isRoundTrip ? (state?.returnFlight ?? storedSelection?.returnFlight) : undefined;
   const flight = rawFlight;
   const returnFlight = rawReturnFlight;
   const passengers = Math.max(1, Math.min(6, state?.passengers ?? storedSelection?.passengers ?? 1));
-  const trip = state?.trip ?? storedSelection?.trip;
   const basePrice = Number.parseInt((flight?.price ?? "0").replace(/[^\d]/g, ""), 10) || 0;
   const returnBasePrice = Number.parseInt((returnFlight?.price ?? "0").replace(/[^\d]/g, ""), 10) || 0;
-  const totalPrice = basePrice * passengers + (trip?.tripType === 'round-trip' ? returnBasePrice * passengers : 0);
+  const totalPrice = basePrice * passengers + (isRoundTrip ? returnBasePrice * passengers : 0);
 
   const seatRows = useMemo(() => ["A", "B", "C", "D", "E", "F"], []);
   const seatNumbers = useMemo(() => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], []);
 
-  const [selectedSeats, setSelectedSeats] = useState<string[]>(storedSelection?.selectedSeats ?? []);
-  const [returnSelectedSeats, setReturnSelectedSeats] = useState<string[]>(storedSelection?.returnSelectedSeats ?? []);
+  const [selectedSeats, setSelectedSeats] = useState<string[]>(() => state?.selectedSeats ?? []);
+  const [returnSelectedSeats, setReturnSelectedSeats] = useState<string[]>(() => {
+    if (!isRoundTrip) return [];
+    return state?.returnSelectedSeats ?? [];
+  });
   const [outboundBookedSeats, setOutboundBookedSeats] = useState<string[]>([]);
   const [returnBookedSeats, setReturnBookedSeats] = useState<string[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
@@ -122,7 +126,7 @@ function Seat() {
       try {
         const requests = [
           api.get(`/payments/seats/${encodeURIComponent(String(flight.id))}`),
-          ...(trip?.tripType === 'round-trip' && returnFlight?.id
+          ...(isRoundTrip && returnFlight?.id
             ? [api.get(`/payments/seats/${encodeURIComponent(String(returnFlight.id))}`)]
             : []),
         ];
@@ -156,16 +160,23 @@ function Seat() {
     return () => {
       active = false;
     };
-  }, [flight?.id, returnFlight?.id, trip?.tripType]);
+  }, [flight?.id, returnFlight?.id, isRoundTrip]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.sessionStorage.setItem(
         storageKey,
-        JSON.stringify({ flight, returnFlight, passengers, trip, selectedSeats, returnSelectedSeats })
+        JSON.stringify({
+          flight,
+          returnFlight: isRoundTrip ? returnFlight : undefined,
+          passengers,
+          trip,
+          selectedSeats,
+          returnSelectedSeats: isRoundTrip ? returnSelectedSeats : [],
+        })
       );
     }
-  }, [flight, returnFlight, passengers, trip, selectedSeats, returnSelectedSeats, storageKey]);
+  }, [flight, returnFlight, passengers, trip, selectedSeats, returnSelectedSeats, storageKey, isRoundTrip]);
 
   const toggleSeat = (seat: string, segment: 'outbound' | 'return') => {
     const currentlyBookedSeats = segment === 'return' ? returnBookedSeats : outboundBookedSeats;
@@ -239,7 +250,7 @@ function Seat() {
     }
   };
 
-  const canProceedToBooking = trip?.tripType === 'round-trip'
+  const canProceedToBooking = isRoundTrip
     ? selectedSeats.length === passengers && returnSelectedSeats.length === passengers
     : selectedSeats.length === passengers;
 
@@ -480,7 +491,7 @@ function Seat() {
                 </div>
 
                 {/* Return Flight Cabin - Airplane Paper Format */}
-                {trip?.tripType === 'round-trip' && returnFlight && (
+                {isRoundTrip && returnFlight && (
                   <div className="relative overflow-hidden rounded-3xl border-2 border-indigo-200 bg-gradient-to-br from-white via-indigo-50/30 to-white shadow-xl">
                     {/* Decorative perforated edge */}
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-indigo-100/50 to-transparent">
@@ -678,7 +689,7 @@ function Seat() {
                   )}
 
                   {/* Return Date & Time - Only for Round Trip */}
-                  {trip?.tripType === 'round-trip' && returnFlight && (
+                  {isRoundTrip && returnFlight && (
                     <>
                       <div className="border-t border-slate-200 pt-2 mt-2">
                         <p className="text-xs font-semibold text-indigo-600 mb-2">RETURN FLIGHT</p>
@@ -751,7 +762,7 @@ function Seat() {
                 </div>
 
                 {/* Selected Seats - Return */}
-                {trip?.tripType === 'round-trip' && returnFlight && (
+                {isRoundTrip && returnFlight && (
                   <div className="mt-4 rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
                     <div className="mb-3 flex items-center gap-2 text-sm font-bold text-indigo-700">
                       <Plane size={16} className="rotate-180" />
@@ -815,7 +826,7 @@ function Seat() {
                 </div>
 
                 {/* CTA Button */}
-                {trip?.tripType === 'round-trip' && returnFlight ? (
+                {isRoundTrip && returnFlight ? (
                   <div className="mt-6 space-y-3">
                     {selectedSeats.length === passengers && returnSelectedSeats.length < passengers && (
                       <button

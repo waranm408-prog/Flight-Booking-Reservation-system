@@ -228,86 +228,86 @@ function mapFlightAwareFlight(item, originCode, destinationCode, cabinClass) {
   };
 }
 
-// Amadeus API - Get access token
-async function getAmadeusToken() {
-  if (!AMADEUS_API_KEY || !AMADEUS_API_SECRET) return null;
-  try {
-    const response = await axios.post('https://test.api.amadeus.com/v1/security/oauth2/token', 
-      new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: AMADEUS_API_KEY,
-        client_secret: AMADEUS_API_SECRET,
-      }), {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      }
-    );
-    return response.data.access_token;
-  } catch (error) {
-    console.error('Amadeus token error:', error.message);
-    return null;
-  }
-}
+// // Amadeus API - Get access token
+// async function getAmadeusToken() {
+//   if (!AMADEUS_API_KEY || !AMADEUS_API_SECRET) return null;
+//   try {
+//     const response = await axios.post('https://test.api.amadeus.com/v1/security/oauth2/token', 
+//       new URLSearchParams({
+//         grant_type: 'client_credentials',
+//         client_id: AMADEUS_API_KEY,
+//         client_secret: AMADEUS_API_SECRET,
+//       }), {
+//         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+//       }
+//     );
+//     return response.data.access_token;
+//   } catch (error) {
+//     console.error('Amadeus token error:', error.message);
+//     return null;
+//   }
+// }
 
-// Fetch from Amadeus API (Best for flight offers)
-async function fetchAmadeusFlights(from, to, cabinClass, departureDate) {
-  const originCode = getAirportCode(from);
-  const destinationCode = getAirportCode(to);
+// // Fetch from Amadeus API (Best for flight offers)
+// async function fetchAmadeusFlights(from, to, cabinClass, departureDate) {
+//   const originCode = getAirportCode(from);
+//   const destinationCode = getAirportCode(to);
   
-  if (!originCode || !destinationCode) return [];
+//   if (!originCode || !destinationCode) return [];
   
-  const token = await getAmadeusToken();
-  if (!token) return [];
+//   const token = await getAmadeusToken();
+//   if (!token) return [];
 
-  try {
-    const response = await axios.get(`${AMADEUS_BASE_URL}/shopping/flight-offers`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      params: {
-        originLocationCode: originCode,
-        destinationLocationCode: destinationCode,
-        departureDate: departureDate || new Date().toISOString().split('T')[0],
-        adults: 1,
-        travelClass: cabinClass.toUpperCase(),
-        max: 10,
-      },
-    });
+//   try {
+//     const response = await axios.get(`${AMADEUS_BASE_URL}/shopping/flight-offers`, {
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//       },
+//       params: {
+//         originLocationCode: originCode,
+//         destinationLocationCode: destinationCode,
+//         departureDate: departureDate || new Date().toISOString().split('T')[0],
+//         adults: 1,
+//         travelClass: cabinClass.toUpperCase(),
+//         max: 10,
+//       },
+//     });
 
-    const offers = response.data?.data || [];
-    return offers.map((offer, index) => {
-      const itinerary = offer.itineraries?.[0];
-      const segment = itinerary?.segments?.[0];
-      const carrierCode = segment?.operating?.carrierCode || segment?.carrierCode || 'XX';
-      const airlineName = getAirlineName(carrierCode);
-      const flightNumber = segment?.number || '000';
-      const depDateTime = parseFlightDateTime(segment?.departure?.at, new Date(departureDate || undefined));
-      const arrDateTime = parseFlightDateTime(segment?.arrival?.at, depDateTime || new Date(departureDate || undefined));
+//     const offers = response.data?.data || [];
+//     return offers.map((offer, index) => {
+//       const itinerary = offer.itineraries?.[0];
+//       const segment = itinerary?.segments?.[0];
+//       const carrierCode = segment?.operating?.carrierCode || segment?.carrierCode || 'XX';
+//       const airlineName = getAirlineName(carrierCode);
+//       const flightNumber = segment?.number || '000';
+//       const depDateTime = parseFlightDateTime(segment?.departure?.at, new Date(departureDate || undefined));
+//       const arrDateTime = parseFlightDateTime(segment?.arrival?.at, depDateTime || new Date(departureDate || undefined));
 
-      return {
-        id: `amadeus-${offer.id || index}`,
-        airline: airlineName,
-        logo: getAirlineLogo(carrierCode),
-        departureTime: formatTo12Hour(depDateTime || segment?.departure?.at),
-        arrivalTime: formatTo12Hour(arrDateTime || segment?.arrival?.at),
-        departureDateTime: depDateTime ? depDateTime.toISOString() : undefined,
-        arrivalDateTime: arrDateTime ? arrDateTime.toISOString() : undefined,
-        departureDate: depDateTime ? depDateTime.toISOString() : undefined,
-        arrivalDate: arrDateTime ? arrDateTime.toISOString() : undefined,
-        duration: itinerary?.duration?.replace('PT', '').toLowerCase() || 'N/A',
-        stops: (itinerary?.segments?.length || 1) - 1,
-        price: `₹${Math.floor(Number(offer.price?.total || 0) * 82)}`,
-        cabinClass,
-        origin: originCode,
-        destination: destinationCode,
-        flightNo: `${carrierCode}${flightNumber}`,
-        dataSource: 'live',
-      };
-    });
-  } catch (error) {
-    console.error('Amadeus API error:', error.message);
-    return [];
-  }
-}
+//       return {
+//         id: `amadeus-${offer.id || index}`,
+//         airline: airlineName,
+//         logo: getAirlineLogo(carrierCode),
+//         departureTime: formatTo12Hour(depDateTime || segment?.departure?.at),
+//         arrivalTime: formatTo12Hour(arrDateTime || segment?.arrival?.at),
+//         departureDateTime: depDateTime ? depDateTime.toISOString() : undefined,
+//         arrivalDateTime: arrDateTime ? arrDateTime.toISOString() : undefined,
+//         departureDate: depDateTime ? depDateTime.toISOString() : undefined,
+//         arrivalDate: arrDateTime ? arrDateTime.toISOString() : undefined,
+//         duration: itinerary?.duration?.replace('PT', '').toLowerCase() || 'N/A',
+//         stops: (itinerary?.segments?.length || 1) - 1,
+//         price: `₹${Math.floor(Number(offer.price?.total || 0) * 82)}`,
+//         cabinClass,
+//         origin: originCode,
+//         destination: destinationCode,
+//         flightNo: `${carrierCode}${flightNumber}`,
+//         dataSource: 'live',
+//       };
+//     });
+//   } catch (error) {
+//     console.error('Amadeus API error:', error.message);
+//     return [];
+//   }
+// }
 
 // Fetch from AirLabs API (Real-time flight data)
 async function fetchAirLabsFlights(from, to, cabinClass, departureDate) {
@@ -329,6 +329,7 @@ async function fetchAirLabsFlights(from, to, cabinClass, departureDate) {
         arr_iata: destinationCode || undefined,
       },
     });
+    console.log('📡 AirLabs API response received',response.data);
 
     const flights = response.data?.response || [];
     

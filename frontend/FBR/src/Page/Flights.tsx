@@ -354,7 +354,7 @@ function Flights() {
     const syncedOutboundFlight = syncFlightWithTripDate(selectedOutboundFlight, sanitizedTrip.departureDate);
     const syncedReturnFlight = formik.values.tripType === 'round-trip'
       ? syncFlightWithTripDate(selectedReturnFlight, sanitizedTrip.returnDate || sanitizedTrip.departureDate)
-      : selectedReturnFlight;
+      : undefined;
 
     return {
       flight: syncedOutboundFlight,
@@ -453,6 +453,8 @@ function Flights() {
                   formik.handleChange(e);
                   if (e.target.checked) {
                     formik.setFieldValue('returnDate', '');
+                    setSelectedReturnFlight(null);
+                    setReturnFlights([]);
                   }
                 }}
                 className="w-4 h-4 text-blue-600 cursor-pointer"
