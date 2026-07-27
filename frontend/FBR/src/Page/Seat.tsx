@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Armchair, CheckCircle2, Plane, ArrowRight, Info, Crown } from "lucide-react";
+import { ArrowLeft, Armchair, CheckCircle2, Plane, ArrowRight, Crown } from "lucide-react";
 import Navbar from "../components/Navbar";
 import api from "../api/axios";
 
@@ -75,7 +75,7 @@ function Seat() {
   const [returnBookedSeats, setReturnBookedSeats] = useState<string[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [availabilityError, setAvailabilityError] = useState("");
-  const [activeTab, setActiveTab] = useState<'outbound' | 'return'>('outbound');
+  const [, setActiveTab] = useState<'outbound' | 'return'>('outbound');
   const [hoveredSeat, setHoveredSeat] = useState<string | null>(null);
 
   // Premium/Emergency exit rows (rows 1-2 and 12)
