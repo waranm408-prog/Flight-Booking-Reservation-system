@@ -87,6 +87,28 @@ function normalizeSeats(seats) {
   return [...new Set(seats.map((seat) => seat.toString().trim().toUpperCase()).filter(Boolean))];
 }
 
+function normalizeDateValue(value) {
+  if (value == null || value === '') return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+
+  const text = value.toString().trim();
+  if (!text) return null;
+
+  const dateOnlyMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
 router.get('/seats/:flightId', async function (req, res) {
   try {
     const flightId = (req.params.flightId || '').toString().trim();
@@ -119,23 +141,90 @@ async function sendBookingConfirmationEmail(recipientEmail, bookingData, payment
     return;
   }
 
+  const isRoundTrip = bookingData.isRoundTrip || bookingData.tripType === 'round-trip';
   const subject = `Booking confirmed for ${bookingData.flightName || 'your flight'}`;
+  
   const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
-      <h2 style="color: #2563eb;">Your flight booking is confirmed</h2>
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #2563eb;">Your flight booking is confirmed ✈️</h2>
       <p>Hi,</p>
       <p>Your payment was successful and your booking has been confirmed.</p>
-      <p><strong>Flight:</strong> ${bookingData.flightName || 'N/A'}</p>
-      <p><strong>Route:</strong> ${bookingData.origin || 'N/A'} → ${bookingData.destination || 'N/A'}</p>
-      <p><strong>Departure:</strong> ${bookingData.departureTime || 'N/A'}</p>
-      <p><strong>Arrival:</strong> ${bookingData.arrivalTime || 'N/A'}</p>
-      <p><strong>Cabin Class:</strong> ${bookingData.cabinClass || 'Economy'}</p>
-      <p><strong>Passenger(s):</strong><br/>${formatPassengerSummary(bookingData.passengers)}</p>
-      <p><strong>Seats:</strong> ${formatSeatSummary(bookingData.seats)}</p>
-      <p><strong>Total Amount:</strong> ₹${Number(bookingData.amount || 0).toLocaleString('en-IN')}</p>
-      <p><strong>Payment ID:</strong> ${paymentId}</p>
-      <p><strong>Order ID:</strong> ${orderId}</p>
-      <p>Thank you for choosing SkyElite.</p>
+      
+      ${isRoundTrip ? '<h3 style="color: #1e293b; margin-top: 30px;">📍 Trip Type: Round Trip</h3>' : '<h3 style="color: #1e293b; margin-top: 30px;">📍 Trip Type: One Way</h3>'}
+      
+      <!-- OUTBOUND FLIGHT DETAILS -->
+      <div style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #2563eb;">
+        <h3 style="margin-top: 0; color: #1e40af; display: flex; align-items: center;">
+          ✈️ OUTBOUND FLIGHT
+        </h3>
+        <div style="background: white; padding: 15px; border-radius: 8px; margin-top: 10px;">
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Airline:</strong> ${bookingData.airline || bookingData.flightName || 'N/A'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Flight Number:</strong> ${bookingData.flightNo || 'N/A'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Route:</strong> ${bookingData.origin || 'N/A'} → ${bookingData.destination || 'N/A'}</p>
+          
+          <div style="background: #f1f5f9; padding: 12px; border-radius: 6px; margin-top: 12px;">
+            <p style="margin: 6px 0;"><strong style="color: #334155;">📅 Departure:</strong> ${bookingData.departureTime || 'N/A'}${bookingData.departureDate ? ` on ${new Date(bookingData.departureDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}</p>
+            <p style="margin: 6px 0;"><strong style="color: #334155;">🛬 Arrival:</strong> ${bookingData.arrivalTime || 'N/A'}${bookingData.arrivalDate ? ` on ${new Date(bookingData.arrivalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}</p>
+          </div>
+          
+          <p style="margin: 8px 0; margin-top: 12px;"><strong style="color: #475569;">⏱️ Duration:</strong> ${bookingData.duration || 'N/A'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">🔄 Stops:</strong> ${bookingData.stops === 0 ? 'Non-stop' : `${bookingData.stops} stop(s)`}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">💺 Cabin Class:</strong> ${bookingData.cabinClass || 'Economy'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">🪑 Seats:</strong> ${formatSeatSummary(bookingData.seats)}</p>
+        </div>
+      </div>
+      
+      ${isRoundTrip ? `
+      <!-- RETURN FLIGHT DETAILS -->
+      <div style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%); padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #059669;">
+        <h3 style="margin-top: 0; color: #047857; display: flex; align-items: center;">
+          🔄 RETURN FLIGHT
+        </h3>
+        <div style="background: white; padding: 15px; border-radius: 8px; margin-top: 10px;">
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Airline:</strong> ${bookingData.returnFlightName || bookingData.airline || bookingData.flightName || 'N/A'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Flight Number:</strong> ${bookingData.returnFlightNo || bookingData.flightNo || 'N/A'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Route:</strong> ${bookingData.destination || 'N/A'} → ${bookingData.origin || 'N/A'}</p>
+          
+          <div style="background: #f1f5f9; padding: 12px; border-radius: 6px; margin-top: 12px;">
+            <p style="margin: 6px 0;"><strong style="color: #334155;">📅 Departure:</strong> ${bookingData.returnDepartureTime || 'N/A'}${bookingData.returnDepartureDate ? ` on ${new Date(bookingData.returnDepartureDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : (bookingData.returnDate ? ` on ${new Date(bookingData.returnDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : '')}</p>
+            <p style="margin: 6px 0;"><strong style="color: #334155;">🛬 Arrival:</strong> ${bookingData.returnArrivalTime || 'N/A'}${bookingData.returnArrivalDate ? ` on ${new Date(bookingData.returnArrivalDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}</p>
+          </div>
+          
+          <p style="margin: 8px 0; margin-top: 12px;"><strong style="color: #475569;">⏱️ Duration:</strong> ${bookingData.duration || 'N/A'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">🔄 Stops:</strong> ${bookingData.stops === 0 ? 'Non-stop' : `${bookingData.stops} stop(s)`}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">💺 Cabin Class:</strong> ${bookingData.cabinClass || 'Economy'}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">🪑 Return Seats:</strong> ${formatSeatSummary(bookingData.returnSeats)}</p>
+        </div>
+      </div>
+      ` : ''}
+      
+      <!-- PASSENGER DETAILS -->
+      <div style="background: #f8fafc; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #64748b;">
+        <h3 style="margin-top: 0; color: #1e293b;">👥 Passenger Details</h3>
+        <div style="background: white; padding: 15px; border-radius: 8px;">
+          <p style="margin: 0;">${formatPassengerSummary(bookingData.passengers)}</p>
+        </div>
+      </div>
+      
+      <!-- PAYMENT DETAILS -->
+      <div style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #10b981;">
+        <h3 style="margin-top: 0; color: #047857;">💳 Payment Details</h3>
+        <div style="background: white; padding: 15px; border-radius: 8px;">
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Total Amount:</strong> <span style="color: #059669; font-size: 18px; font-weight: bold;">₹${Number(bookingData.amount || 0).toLocaleString('en-IN')}</span></p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Payment ID:</strong> ${paymentId}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Order ID:</strong> ${orderId}</p>
+          <p style="margin: 8px 0;"><strong style="color: #475569;">Status:</strong> <span style="color: #059669; font-weight: bold;">✓ Confirmed</span></p>
+        </div>
+      </div>
+      
+      ${bookingData.dataSource === 'live' ? '<div style="background: #dcfce7; padding: 12px; border-radius: 8px; margin: 20px 0;"><p style="color: #059669; font-weight: bold; margin: 0;">✓ Live flight data confirmed</p></div>' : ''}
+      
+      <p style="margin-top: 30px;">Thank you for choosing SkyElite. Have a safe flight! ✈️</p>
+      
+      <div style="border-top: 2px solid #e2e8f0; margin-top: 30px; padding-top: 20px;">
+        <p style="color: #64748b; font-size: 12px; margin: 5px 0;">This is an automated confirmation email. Please keep this for your records.</p>
+        <p style="color: #64748b; font-size: 12px; margin: 5px 0;">For support, contact us at support@skyelite.com</p>
+      </div>
     </div>
   `;
 
@@ -243,18 +332,36 @@ router.post('/verify', async function (req, res) {
         userId: bookingData.userId || null,
         userEmail,
         flightId,
-        flightName: bookingData.flightName || '',
+        flid: bookingData.flid || null,
+        isRoundTrip: Boolean(bookingData.isRoundTrip || bookingData.tripType === 'round-trip'),
+        flightName: bookingData.flightName || bookingData.airline || '',
+        flightNo: bookingData.flightNo || '',
+        airline: bookingData.airline || bookingData.flightName || '',
         origin: bookingData.origin || '',
         destination: bookingData.destination || '',
         departureTime: bookingData.departureTime || '',
         arrivalTime: bookingData.arrivalTime || '',
+        departureDate: normalizeDateValue(bookingData.departureDate || ''),
+        arrivalDate: normalizeDateValue(bookingData.arrivalDate || ''),
+        tripType: bookingData.tripType || 'one-way',
+        returnDate: normalizeDateValue(bookingData.returnDate || ''),
+        returnFlightName: bookingData.returnFlightName || '',
+        returnFlightNo: bookingData.returnFlightNo || '',
+        returnDepartureTime: bookingData.returnDepartureTime || '',
+        returnArrivalTime: bookingData.returnArrivalTime || '',
+        returnDepartureDate: normalizeDateValue(bookingData.returnDepartureDate || ''),
+        returnArrivalDate: normalizeDateValue(bookingData.returnArrivalDate || ''),
+        duration: bookingData.duration || '',
+        stops: bookingData.stops || 0,
         cabinClass: bookingData.cabinClass || 'Economy',
         passengers: normalizedPassengers,
         seats,
+        returnSeats: Array.isArray(bookingData.returnSeats) ? normalizeSeats(bookingData.returnSeats) : [],
         amount: bookingData.amount || 0,
         paymentId: razorpay_payment_id,
         orderId: razorpay_order_id,
         status: 'confirmed',
+        dataSource: bookingData.dataSource || 'fallback',
       });
 
       try {

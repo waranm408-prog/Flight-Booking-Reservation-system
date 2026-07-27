@@ -1,9 +1,10 @@
 {
-  "name": "fbr",
-  "private": true,
+  "name": "flight-booking-and-reservation-system",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
+    "start": "node ./bin/www",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
@@ -12,15 +13,22 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
     "axios": "^1.18.1",
+    "cookie-parser": "~1.4.4",
+    "debug": "~2.6.9",
+    "express": "~4.16.1",
     "formik": "^2.4.9",
+    "http-errors": "~1.6.3",
+    "jade": "~1.11.0",
     "jspdf": "^2.5.2",
     "lucide-react": "^1.21.0",
+    "morgan": "~1.9.1",
     "razorpay": "^2.9.6",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.0",
     "react-router-hash-link": "^2.4.3",
-    "tailwindcss": "^4.3.1"
+    "tailwindcss": "^4.3.1",
+    "yup": "^1.7.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
