@@ -35,7 +35,6 @@ export default function AdminPayments() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   const loadPayments = async () => {
     try {
@@ -48,16 +47,6 @@ export default function AdminPayments() {
       setError(err?.response?.data?.message || 'Unable to load payments.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updatePaymentStatus = async (bookingId: string, status: string) => {
-    try {
-      const response = await api.put(`/bookings/${bookingId}/status`, { status });
-      setSuccess(response.data.booking?.status ? `Payment marked as ${response.data.booking.status}.` : 'Payment updated.');
-      loadPayments();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Unable to update payment.');
     }
   };
 
@@ -83,7 +72,6 @@ export default function AdminPayments() {
         </div>
 
         {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">{error}</div> : null}
-        {success ? <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">{success}</div> : null}
 
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-xl font-semibold text-slate-800">Confirmed and Called Payments</h3>
@@ -173,49 +161,29 @@ export default function AdminPayments() {
                           <svg className="h-4 w-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
-                          <span className="text-xs font-bold uppercase text-purple-700">Details</span>
+                          <span className="text-xs font-bold uppercase text-purple-700">Payment Info</span>
                         </div>
-                        <div className="space-y-1 text-xs">
-                          <div className={`inline-block rounded-full px-2.5 py-1 font-bold mb-1 ${
-                            payment.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
-                            payment.status === 'completed' ? 'bg-blue-100 text-blue-700' :
-                            payment.status === 'cancelled' ? 'bg-rose-100 text-rose-700' :
-                            'bg-amber-100 text-amber-700'
-                          }`}>
-                            {payment.status === 'confirmed' ? '✓ Confirmed' : 
-                             payment.status === 'completed' ? '✓ Completed' :
-                             payment.status === 'cancelled' ? '✗ Cancelled' : payment.status}
-                          </div>
+                        <div className="space-y-1.5 text-xs">
                           <div className="text-slate-600">
                             <div className="font-semibold text-slate-700">Passengers: {payment.passengers.length}</div>
+                          </div>
+                          <div className="text-slate-600">
+                            <span className="font-semibold text-slate-700">Payment ID:</span>
+                            <div className="mt-0.5 text-xs font-mono text-purple-600 break-all">{payment.paymentId || 'N/A'}</div>
+                          </div>
+                          <div className="text-slate-600">
+                            <span className="font-semibold text-slate-700">Order ID:</span>
+                            <div className="mt-0.5 text-xs font-mono text-purple-600 break-all">{payment.orderId || 'N/A'}</div>
                           </div>
                         </div>
                       </div>
                     </div>
                     
-                    {/* User & Payment Info */}
+                    {/* User Info */}
                     <div className="mt-2 pt-3 border-t border-slate-200">
-                      <div className="text-sm text-slate-600 mb-1">
-                        <span className="font-semibold">User:</span> {payment.userEmail || 'Unknown user'}
+                      <div className="text-sm text-slate-600">
+                        <span className="font-semibold">User Email:</span> {payment.userEmail || 'Unknown user'}
                       </div>
-                      <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                        <span><span className="font-semibold">Payment ID:</span> {payment.paymentId || 'N/A'}</span>
-                        <span>•</span>
-                        <span><span className="font-semibold">Order ID:</span> {payment.orderId || 'N/A'}</span>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-200">
-                      <button onClick={() => updatePaymentStatus(payment._id, 'confirmed')} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
-                        Confirm Payment
-                      </button>
-                      <button onClick={() => updatePaymentStatus(payment._id, 'pending')} className="rounded-xl bg-amber-600 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-700 transition-colors">
-                        Mark Pending
-                      </button>
-                      <button onClick={() => updatePaymentStatus(payment._id, 'cancelled')} className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700 transition-colors">
-                        Cancel
-                      </button>
                     </div>
                   </div>
                 </div>

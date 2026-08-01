@@ -8,18 +8,32 @@ function authenticateUser(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
 
+  console.log('=== authenticateUser ===');
+  console.log('Has token:', !!token);
+
   if (!token) return res.status(401).json({ message: 'Missing authentication token' });
 
   jwt.verify(token, JWT_SECRET, function (err, decoded) {
-    if (err) return res.status(403).json({ message: 'Invalid or expired token' });
+    if (err) {
+      console.log('Token verification error:', err.message);
+      return res.status(403).json({ message: 'Invalid or expired token' });
+    }
+    console.log('Token decoded:', { email: decoded.email, role: decoded.role });
     req.user = decoded;
     next();
   });
 }
 
 function authenticateAdmin(req, res, next) {
-  authenticateUser(req, res, function () {
-    if (req.user?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).json({ message: 'Missing authentication token' });
+
+  jwt.verify(token, JWT_SECRET, function (err, decoded) {
+    if (err) return res.status(403).json({ message: 'Invalid or expired token' });
+    if (decoded?.role !== 'admin') return res.status(403).json({ message: 'Admin access required' });
+    req.user = decoded;
     next();
   });
 }
@@ -72,20 +86,65 @@ router.get('/', authenticateUser, async function (req, res) {
   }
 });
 
-router.put('/:id/status', authenticateAdmin, async function (req, res) {
+router.put('/:id/status', authenticateUser, async function (req, res) {
   try {
     const { status } = req.body;
-    const booking = await Booking.findByIdAndUpdate(
-      req.params.id,
+    const bookingId = req.params.id;
+    const isAdmin = req.user?.role === 'admin';
+    const currentEmail = (req.user?.email || '').toString().trim();
+
+    console.log('=== Update Booking Status ===');
+    console.log('User:', { email: currentEmail, role: req.user?.role, isAdmin });
+    console.log('Requested status:', status);
+    console.log('Booking ID:', bookingId);
+
+    // Find the booking first
+    const booking = await Booking.findById(bookingId);
+
+    if (!booking) {
+      console.log('Booking not found');
+      return res.status(404).json({ message: 'Booking not found.' });
+    }
+
+    console.log('Booking found:', { 
+      userEmail: booking.userEmail, 
+      passengerEmails: booking.passengers?.map(p => p.email) 
+    });
+
+    // Check permissions
+    // Admins can update any booking to any status
+    // Regular users can confirm or cancel their own bookings only
+    if (!isAdmin) {
+      // Check if this booking belongs to the current user
+      const isOwner = 
+        booking.userEmail === currentEmail ||
+        booking.passengers?.some(p => p.email === currentEmail);
+
+      console.log('Ownership check:', { isOwner, currentEmail, bookingUserEmail: booking.userEmail });
+
+      if (!isOwner) {
+        console.log('Permission denied: Not owner');
+        return res.status(403).json({ message: 'You can only update your own bookings.' });
+      }
+
+      // Regular users can confirm or cancel their own bookings
+      if (status !== 'cancelled' && status !== 'confirmed') {
+        console.log('Permission denied: User can only confirm or cancel');
+        return res.status(403).json({ message: 'You can only confirm or cancel your own bookings.' });
+      }
+    }
+
+    console.log('Permission granted, updating booking...');
+
+    // Update the booking status
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      bookingId,
       { $set: { status } },
       { new: true }
     );
 
-    if (!booking) {
-      return res.status(404).json({ message: 'Booking not found.' });
-    }
-
-    res.json({ booking });
+    console.log('Booking updated successfully');
+    res.json({ booking: updatedBooking });
   } catch (error) {
     console.error('Failed to update booking status:', error);
     res.status(500).json({ message: 'Failed to update booking status.' });

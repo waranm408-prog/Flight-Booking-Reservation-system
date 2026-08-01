@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plane, Receipt, XCircle, CheckCircle2, Download } from 'lucide-react';
+import { ArrowLeft, Plane, Receipt, XCircle, CheckCircle2 } from 'lucide-react';
 import jsPDF from 'jspdf';
 import Navbar from '../components/Navbar';
 import api from '../api/axios';
@@ -101,6 +101,107 @@ const formatTimeValue = (value?: string, fallbackValue?: string) => {
   });
 };
 
+// Decode common HTML entities and numeric entity references safely in the browser.
+const decodeHtmlEntities = (str?: string) => {
+  if (!str) return '';
+  try {
+    if (typeof document !== 'undefined') {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = str;
+      return txt.value;
+    }
+    // Fallback: simple numeric/entity decode for non-DOM environments
+    return String(str).replace(/&(#x?[0-9A-Fa-f]+|[A-Za-z]+);/g, (_m, n) => {
+      if (n[0] === '#') {
+        const isHex = n[1] === 'x' || n[1] === 'X';
+        const code = parseInt(isHex ? n.slice(2) : n.slice(1), isHex ? 16 : 10);
+        return String.fromCharCode(code || 0);
+      }
+      const map: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+      return map[n] || '';
+    });
+  } catch (e) {
+    return String(str);
+  }
+};
+
+const sanitizeString = (value?: string | null) => {
+  if (value === undefined || value === null) return '';
+  let s = String(value);
+  s = decodeHtmlEntities(s);
+  // remove common control characters that break layout
+  s = s.replace(/[\x00-\x1F\x7F]/g, '');
+  // Normalize common superscript digits to regular digits
+  const superscriptMap: Record<string, string> = {
+    '\u00B9': '1', '\u00B2': '2', '\u00B3': '3',
+    '\u2070': '0','\u2071': 'i','\u2074': '4','\u2075': '5','\u2076': '6','\u2077': '7','\u2078': '8','\u2079': '9'
+  };
+  s = s.replace(/[\u00B9\u00B2\u00B3\u2070-\u2079]/g, (ch) => superscriptMap[ch] || '');
+  // remove stray ampersand artifacts
+  s = s.replace(/&/g, '');
+  // collapse spaces around commas and between digits (e.g., `1 6 , 1 3 8` -> `16,138`)
+  s = s.replace(/\s*,\s*/g, ',');
+  // remove spaces between digits iteratively
+  while (/\d\s+\d/.test(s)) {
+    s = s.replace(/(\d)\s+(\d)/g, '$1$2');
+  }
+  // collapse excessive whitespace
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+};
+
+const getDisplayValue = (value?: string | null, fallback = 'No data available') => {
+  const cleaned = sanitizeString(value);
+  return cleaned || fallback;
+};
+
+const formatCurrency = (amount?: number | string | null): string => {
+  if (amount === undefined || amount === null || amount === '') return '₹0';
+
+  let cleanValue: string;
+  
+  // If it's already a number, convert to string
+  if (typeof amount === 'number') {
+    cleanValue = String(amount);
+  } else {
+    // If it's a string, sanitize it first
+    cleanValue = sanitizeString(amount);
+    
+    // Remove ALL non-numeric characters except digits, dot, comma, and minus
+    // This handles corrupted text like ¹&1&6&,&1&3&8
+    cleanValue = cleanValue.replace(/[^\d.,-]/g, '');
+    
+    // Remove any currency symbols that might remain
+    cleanValue = cleanValue.replace(/[₹$€£¥]/g, '');
+    
+    // Normalize: remove spaces between digits
+    cleanValue = cleanValue.replace(/\s+/g, '');
+    
+    // Remove commas (they'll be re-added by toLocaleString)
+    cleanValue = cleanValue.replace(/,/g, '');
+  }
+  
+  // Parse to number
+  const numericAmount = parseFloat(cleanValue);
+  
+  // If parsing fails, return ₹0
+  if (isNaN(numericAmount)) {
+    console.warn('Failed to parse amount:', amount, '-> cleaned:', cleanValue);
+    return '₹0';
+  }
+  
+  // Format with Indian locale (adds commas in correct positions)
+  return `₹${numericAmount.toLocaleString('en-IN', {
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 0
+  })}`;
+};
+
+const formatShortValue = (value?: string | null, fallback = 'No data available') => {
+  const displayValue = getDisplayValue(value, fallback);
+  return displayValue.length > 20 ? `${displayValue.slice(0, 20)}...` : displayValue;
+};
+
 export default function Bookinghistory() {
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<BookingItem[]>([]);
@@ -136,107 +237,314 @@ export default function Bookinghistory() {
   const updateStatus = async (id: string, status: string) => {
     try {
       await api.put(`/bookings/${id}/status`, { status });
+      
+      // Show success message
+      if (status === 'cancelled') {
+       
+      } else if (status === 'confirmed') {
+        
+      }
+      
+      // Reload bookings to reflect the change
       loadBookings();
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      console.error('Failed to update booking status:', error);
+      
+      // Show error message
+      const errorMessage = error.response?.data?.message || 'Failed to update booking status. Please try again.';
+      alert(errorMessage);
     }
   };
 
+  // Sanitize text helper to remove corrupt & characters and clean strings
+  const sanitizeText = (text: any): string => {
+    if (text === undefined || text === null || text === '') return 'N/A';
+    
+    // Convert to string and remove any & separators between characters
+    let cleanText = String(text);
+    
+    // Remove pattern like &R&o&u&t&e& or ¹&1&6&,&1&3&8
+    cleanText = cleanText.replace(/&(.)/g, '$1');
+    
+    // Remove standalone & characters
+    cleanText = cleanText.replace(/&/g, '');
+    
+    // Trim whitespace
+    cleanText = cleanText.trim();
+    
+    return cleanText || 'N/A';
+  };
+
+  // Safe value wrapper with sanitization
+  const getSafeValue = (value: any, fallback = 'N/A'): string => {
+    const cleaned = sanitizeText(value);
+    return cleaned === 'N/A' ? fallback : cleaned;
+  };
+
   const generateBookingPdf = (booking: BookingItem) => {
+    // Helper function to extract clean numeric amount from any format
+    const getCleanAmount = (amount?: number | string | null): number => {
+      if (amount === undefined || amount === null || amount === '') return 0;
+      
+      if (typeof amount === 'number') return amount;
+      
+      // Remove ALL non-numeric characters including currency symbols, superscripts, etc.
+      let cleanValue = String(amount)
+        .replace(/[₹$€£¥]/g, '') // Remove currency symbols
+        .replace(/[\u00B9\u00B2\u00B3\u2070-\u2079]/g, '') // Remove superscripts
+        .replace(/[^\d.,-]/g, '') // Keep only digits, dot, comma, minus
+        .replace(/\s+/g, '') // Remove all spaces
+        .replace(/,/g, ''); // Remove commas
+      
+      const numericAmount = parseFloat(cleanValue);
+      return isNaN(numericAmount) ? 0 : numericAmount;
+    };
+
+    // Sanitize and prepare all data ONCE at the start
+    const bookingId = getSafeValue(booking.orderId || booking._id);
+    const status = getSafeValue(booking.status, 'Pending');
+    const tripType = booking.tripType === 'round-trip' ? 'Round Trip' : 'One Way';
+    const orderId = getSafeValue(booking.orderId);
+    const paymentId = getSafeValue(booking.paymentId);
+    
+    // Get clean numeric amount and format for PDF (using Rs. instead of ₹ for better PDF compatibility)
+    // Note: UI cards use formatCurrency() which displays ₹, but PDF uses ASCII-safe "Rs." prefix
+    const amountNumeric = getCleanAmount(booking.amount);
+    const amountFormatted = 'Rs. ' + amountNumeric.toLocaleString('en-IN', {
+      maximumFractionDigits: 2,
+      minimumFractionDigits: 0
+    });
+
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 40;
-    const lineHeight = 18;
     let y = margin;
 
-    const header = `Booking Receipt - ${booking.flightName}`;
-    doc.setFontSize(18);
-    doc.text(header, margin, y);
+    // Modern Header
+    doc.setFillColor(59, 130, 246);
+    doc.rect(0, 0, pageWidth, 100, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(28);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FLIGHT BOOKING RECEIPT', margin, 50);
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Official Booking Confirmation', margin, 75);
+
+    y = 130;
+
+    // Booking Info Section
+    doc.setFillColor(249, 250, 251);
+    doc.roundedRect(margin, y, pageWidth - (margin * 2), 80, 8, 8, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(1);
+    doc.roundedRect(margin, y, pageWidth - (margin * 2), 80, 8, 8, 'S');
+    
+    y += 25;
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BOOKING INFORMATION', margin + 15, y);
+    
+    y += 20;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    
+    const bookingInfo = [
+      'Booking ID: ' + bookingId,
+      'Status: ' + status,
+      'Trip Type: ' + tripType
+    ];
+    
+    bookingInfo.forEach((line) => {
+      doc.text(line, margin + 15, y);
+      y += 15;
+    });
+
+    y += 20;
+
+    // Outbound Flight Section
+    doc.setFillColor(239, 246, 255);
+    doc.roundedRect(margin, y, pageWidth - (margin * 2), 130, 8, 8, 'F');
+    
+    y += 25;
+    doc.setTextColor(37, 99, 235);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('OUTBOUND FLIGHT', margin + 15, y);
+    
+    y += 20;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    
+    const flightName = getSafeValue(booking.flightName);
+    const flightNo = getSafeValue(booking.flightNo);
+    const origin = getSafeValue(booking.origin);
+    const destination = getSafeValue(booking.destination);
+    const departDate = formatDateValue(booking.departureDate);
+    const departTime = formatTimeValue(booking.departureTime);
+    const cabin = getSafeValue(booking.cabinClass);
+    const seats = booking.seats && booking.seats.length > 0 ? booking.seats.join(', ') : 'N/A';
+    const duration = getSafeValue(booking.duration);
+    const stops = booking.stops === 0 ? 'Non-stop' : getSafeValue(booking.stops);
+    
+    const outboundInfo = [
+      'Flight: ' + flightName + ' (' + flightNo + ')',
+      'Route: ' + origin + ' to ' + destination,
+      'Date: ' + departDate,
+      'Time: ' + departTime,
+      'Cabin: ' + cabin,
+      'Seats: ' + seats,
+      'Duration: ' + duration + ' | Stops: ' + stops
+    ];
+    
+    outboundInfo.forEach((line) => {
+      doc.text(line, margin + 15, y);
+      y += 15;
+    });
+
+    y += 20;
+
+    // Return Flight Section (if round-trip)
+    if (booking.tripType === 'round-trip') {
+      doc.setFillColor(238, 242, 255);
+      doc.roundedRect(margin, y, pageWidth - (margin * 2), 110, 8, 8, 'F');
+      
+      y += 25;
+      doc.setTextColor(79, 70, 229);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('RETURN FLIGHT', margin + 15, y);
+      
+      y += 20;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(51, 65, 85);
+      
+      const returnFlightName = getSafeValue(booking.returnFlightName || booking.flightName);
+      const returnFlightNo = getSafeValue(booking.returnFlightNo || booking.flightNo);
+      const returnDate = formatDateValue(booking.returnDepartureDate || booking.returnDate);
+      const returnTime = formatTimeValue(booking.returnDepartureTime);
+      const returnSeats = booking.returnSeats && booking.returnSeats.length > 0 ? booking.returnSeats.join(', ') : 'N/A';
+      
+      const returnInfo = [
+        'Flight: ' + returnFlightName + ' (' + returnFlightNo + ')',
+        'Route: ' + destination + ' to ' + origin,
+        'Date: ' + returnDate,
+        'Time: ' + returnTime,
+        'Return Seats: ' + returnSeats
+      ];
+      
+      returnInfo.forEach((line) => {
+        doc.text(line, margin + 15, y);
+        y += 15;
+      });
+
+      y += 20;
+    }
+
+    // Passenger Details Section
+    const passengerHeight = Math.min(60 + (booking.passengers.length * 15), 120);
+    doc.setFillColor(249, 250, 251);
+    doc.roundedRect(margin, y, pageWidth - (margin * 2), passengerHeight, 8, 8, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(1);
+    doc.roundedRect(margin, y, pageWidth - (margin * 2), passengerHeight, 8, 8, 'S');
+    
+    y += 25;
+    doc.setTextColor(15, 23, 42);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PASSENGER DETAILS', margin + 15, y);
+    
+    y += 20;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    
+    if (booking.passengers && booking.passengers.length > 0) {
+      booking.passengers.forEach((passenger, index) => {
+        const passengerName = getSafeValue(passenger.name, 'Unnamed');
+        const passengerPhone = getSafeValue(passenger.phone, 'No phone');
+        const passengerEmail = getSafeValue(passenger.email, 'No email');
+        
+        const passengerLine = (index + 1) + '. ' + passengerName + ' | ' + passengerPhone + ' | ' + passengerEmail;
+        doc.text(passengerLine, margin + 15, y);
+        y += 15;
+      });
+    } else {
+      doc.text('No passenger details available', margin + 15, y);
+      y += 15;
+    }
+
+    y += 20;
+
+    // ============================================
+    // SECTION 5: PAYMENT SUMMARY
+    // ============================================
+    doc.setFillColor(236, 253, 245);
+    doc.roundedRect(margin, y, pageWidth - (margin * 2), 120, 8, 8, 'F');
+    doc.setDrawColor(34, 197, 94);
+    doc.setLineWidth(2);
+    doc.roundedRect(margin, y, pageWidth - (margin * 2), 120, 8, 8, 'S');
+    
+    y += 25;
+    doc.setTextColor(5, 150, 105);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('PAYMENT SUMMARY', margin + 15, y);
+    
+    y += 25;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    
+    // Payment Status
+    doc.text('Payment Status: ' + status.toUpperCase(), margin + 15, y);
+    y += 20;
+    
+    // Total Amount Paid - using PDF-safe formatted value
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    doc.text('Total Amount Paid:', margin + 15, y);
+    
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(5, 150, 105);
+    doc.text(amountFormatted, pageWidth - margin - 150, y);
+    
+    y += 25;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    
+    // Order ID - using pre-sanitized value
+    doc.text('Order ID: ' + orderId, margin + 15, y);
+    y += 12;
+    
+    // Payment ID - using pre-sanitized value
+    doc.text('Payment ID: ' + paymentId, margin + 15, y);
+
     y += 30;
 
-    doc.setFontSize(12);
-    doc.text(`Order ID: ${booking.orderId}`, margin, y);
-    y += lineHeight;
-    doc.text(`Payment ID: ${booking.paymentId}`, margin, y);
-    y += lineHeight;
-    doc.text(`Status: ${booking.status}`, margin, y);
-    y += lineHeight;
-    doc.text(`Amount: ₹${booking.amount.toLocaleString()}`, margin, y);
-    y += lineHeight;
-    doc.text(`Booked on: ${formatBookingDate(booking.createdAt)}`, margin, y);
-    y += lineHeight * 2;
-
-    doc.setFontSize(14);
-    doc.text('Flight & Route Details', margin, y);
-    y += lineHeight;
-    doc.setFontSize(12);
-    doc.text(`Flight: ${booking.flightName}`, margin, y);
-    y += lineHeight;
-    if (booking.flightNo) {
-      doc.text(`Flight Number: ${booking.flightNo}`, margin, y);
-      y += lineHeight;
-    }
-    doc.text(`Route: ${booking.origin} → ${booking.destination}`, margin, y);
-    y += lineHeight * 2;
-
-    if (booking.tripType === 'round-trip') {
-      doc.setFontSize(13);
-      doc.text('Return Flight:', margin, y);
-      y += lineHeight;
-      doc.setFontSize(12);
-      doc.text(`Route: ${booking.destination} → ${booking.origin}`, margin, y);
-      y += lineHeight;
-      if (booking.returnFlightName) {
-        doc.text(`Flight: ${booking.returnFlightName}`, margin, y);
-        y += lineHeight;
-      }
-      if (booking.returnSeats && booking.returnSeats.length > 0) {
-        doc.text(`Return Seats: ${booking.returnSeats.join(', ')}`, margin, y);
-        y += lineHeight;
-      }
-      y += lineHeight;
-    }
+    // Footer
+    const footerY = doc.internal.pageSize.getHeight() - 40;
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(1);
+    doc.line(margin, footerY, pageWidth - margin, footerY);
     
-    doc.text(`Cabin Class: ${booking.cabinClass}`, margin, y);
-    y += lineHeight;
-    if (booking.duration) {
-      doc.text(`Duration: ${booking.duration}`, margin, y);
-      y += lineHeight;
-    }
-    if (booking.stops !== undefined) {
-      doc.text(`Stops: ${booking.stops === 0 ? 'Non-stop' : `${booking.stops} stop(s)`}`, margin, y);
-      y += lineHeight;
-    }
-    y += lineHeight;
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Thank you for your booking. Have a pleasant journey!', margin, footerY + 20);
 
-    doc.setFontSize(14);
-    doc.text('Passenger Details', margin, y);
-    y += lineHeight;
-    doc.setFontSize(12);
-    booking.passengers.forEach((passenger, index) => {
-      const passengerText = `${index + 1}. ${passenger.name || 'N/A'} | ${passenger.phone || 'N/A'} | ${passenger.email || 'N/A'}`;
-      doc.text(passengerText, margin, y);
-      y += lineHeight;
-      if (y > 760) {
-        doc.addPage();
-        y = margin;
-      }
-    });
-    y += lineHeight;
-
-    doc.setFontSize(14);
-    doc.text('Seats', margin, y);
-    y += lineHeight;
-    doc.setFontSize(12);
-    doc.text(booking.seats.join(', ') || 'N/A', margin, y);
-    y += lineHeight * 2;
-
-    doc.setFontSize(14);
-    doc.text('Airline / Booking Notes', margin, y);
-    y += lineHeight;
-    doc.setFontSize(12);
-    doc.text(`This document confirms your flight booking details and payment receipt. Please keep it for your records.`, margin, y, { maxWidth: 520 });
-
-    const filename = `booking_receipt_${booking._id}.pdf`;
+    // Save PDF with sanitized filename
+    const filename = 'Flight_Receipt_' + booking._id.substring(0, 8) + '.pdf';
     doc.save(filename);
   };
 
@@ -292,7 +600,7 @@ export default function Bookinghistory() {
                 <Plane size={40} className="text-slate-400" />
               </div>
               <h3 className="text-xl font-bold text-slate-700">No Bookings Yet</h3>
-              <p className="mt-2 text-slate-500">Start exploring flights and book your next adventure!</p>
+              <p className="mt-2 text-slate-500">Your reservation history will appear here once you make a booking.</p>
             </div>
           ) : (
             <div className="space-y-6">
@@ -313,13 +621,14 @@ export default function Bookinghistory() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <Plane size={20} className="text-blue-600" />
-                          <h3 className="text-xl font-bold text-slate-900">{booking.flightName}</h3>
+                          <h3 className="text-xl font-bold text-slate-900">{getDisplayValue(booking.flightName, 'Flight details unavailable')}</h3>
                         </div>
-                        {booking.flightNo && (
-                          <p className="mt-1 text-sm text-slate-500">Flight {booking.flightNo}</p>
-                        )}
+                        <p className="mt-1 text-sm text-slate-500">{getDisplayValue(booking.flightNo, 'No flight number available')}</p>
                         <p className="mt-2 text-xs text-slate-500">
                           <span className="font-semibold">Booked:</span> {formatBookingDate(booking.createdAt)}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          <span className="font-semibold">Reference:</span> {getDisplayValue(booking.orderId || booking._id, 'No booking reference available')}
                         </p>
                       </div>
                       
@@ -329,7 +638,7 @@ export default function Bookinghistory() {
                             ? 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border border-emerald-300' 
                             : 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 border border-amber-300'
                         }`}>
-                          {booking.status === 'confirmed' ? '✓ Confirmed' : booking.status}
+                          {booking.status === 'confirmed' ? '✓ Confirmed' : getDisplayValue(booking.status, 'Pending')}
                         </span>
                       </div>
                     </div>
@@ -359,31 +668,27 @@ export default function Bookinghistory() {
                           
                           <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
                             <div className="text-xs font-semibold text-slate-500">Route</div>
-                            <div className="mt-1 font-bold text-slate-900">{booking.origin} → {booking.destination}</div>
+                            <div className="mt-1 font-bold text-slate-900 break-words max-w-full">{getDisplayValue(booking.origin, 'Not available')} → {getDisplayValue(booking.destination, 'Not available')}</div>
                           </div>
 
                           <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
                             <div className="text-xs font-semibold text-slate-500">Cabin Class</div>
-                            <div className="mt-1 font-bold text-slate-900">{booking.cabinClass || 'N/A'}</div>
+                            <div className="mt-1 font-bold text-slate-900 truncate">{getDisplayValue(booking.cabinClass, 'No cabin class available')}</div>
                           </div>
 
-                          {booking.duration && (
-                            <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                              <div className="text-xs font-semibold text-slate-500">Duration</div>
-                              <div className="mt-1 font-bold text-slate-900">{booking.duration}</div>
-                            </div>
-                          )}
+                          <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                            <div className="text-xs font-semibold text-slate-500">Duration</div>
+                            <div className="mt-1 font-bold text-slate-900 truncate">{getDisplayValue(booking.duration, 'No duration available')}</div>
+                          </div>
 
-                          {booking.stops !== undefined && (
-                            <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                              <div className="text-xs font-semibold text-slate-500">Stops</div>
-                              <div className="mt-1 font-bold text-slate-900">{booking.stops === 0 ? 'Non-stop' : `${booking.stops} stop(s)`}</div>
-                            </div>
-                          )}
+                          <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                            <div className="text-xs font-semibold text-slate-500">Stops</div>
+                            <div className="mt-1 font-bold text-slate-900">{booking.stops === undefined ? 'No stop data available' : booking.stops === 0 ? 'Non-stop' : `${booking.stops} stop(s)`}</div>
+                          </div>
                           
                           <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
                             <div className="text-xs font-semibold text-slate-500">Seats</div>
-                            <div className="mt-1 font-bold text-slate-900">{booking.seats?.join(', ') || 'N/A'}</div>
+                            <div className="mt-1 font-bold text-slate-900 break-words max-w-full">{booking.seats && booking.seats.length > 0 ? booking.seats.join(', ') : 'No seat data available'}</div>
                           </div>
                         </div>
                       </div>
@@ -412,31 +717,27 @@ export default function Bookinghistory() {
                             
                             <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
                               <div className="text-xs font-semibold text-slate-500">Route</div>
-                              <div className="mt-1 font-bold text-slate-900">{booking.destination} → {booking.origin}</div>
+                              <div className="mt-1 font-bold text-slate-900 break-words max-w-full">{getDisplayValue(booking.destination, 'Not available')} → {getDisplayValue(booking.origin, 'Not available')}</div>
                             </div>
 
                             <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
                               <div className="text-xs font-semibold text-slate-500">Cabin Class</div>
-                              <div className="mt-1 font-bold text-slate-900">{booking.cabinClass || 'N/A'}</div>
+                              <div className="mt-1 font-bold text-slate-900 truncate">{getDisplayValue(booking.cabinClass, 'No cabin class available')}</div>
                             </div>
 
-                            {booking.duration && (
-                              <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                                <div className="text-xs font-semibold text-slate-500">Duration</div>
-                                <div className="mt-1 font-bold text-slate-900">{booking.duration}</div>
-                              </div>
-                            )}
+                            <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                              <div className="text-xs font-semibold text-slate-500">Duration</div>
+                              <div className="mt-1 font-bold text-slate-900 truncate">{getDisplayValue(booking.duration, 'No duration available')}</div>
+                            </div>
 
-                            {booking.stops !== undefined && (
-                              <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                                <div className="text-xs font-semibold text-slate-500">Stops</div>
-                                <div className="mt-1 font-bold text-slate-900">{booking.stops === 0 ? 'Non-stop' : `${booking.stops} stop(s)`}</div>
-                              </div>
-                            )}
+                            <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
+                              <div className="text-xs font-semibold text-slate-500">Stops</div>
+                              <div className="mt-1 font-bold text-slate-900">{booking.stops === undefined ? 'No stop data available' : booking.stops === 0 ? 'Non-stop' : `${booking.stops} stop(s)`}</div>
+                            </div>
                             
                             <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
                               <div className="text-xs font-semibold text-slate-500">Seats</div>
-                              <div className="mt-1 font-bold text-slate-900">{booking.returnSeats?.join(', ') || 'N/A'}</div>
+                              <div className="mt-1 font-bold text-slate-900 break-words max-w-full">{booking.returnSeats && booking.returnSeats.length > 0 ? booking.returnSeats.join(', ') : 'No return seat data available'}</div>
                             </div>
                           </div>
                         </div>
@@ -453,26 +754,35 @@ export default function Bookinghistory() {
                       )}
 
                       {/* Payment Receipt Card */}
-                      <div className="rounded-2xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-4 shadow-md">
+                      <div className="rounded-2xl border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-4 shadow-md overflow-hidden">
                         <div className="mb-3 flex items-center gap-2">
                           <Receipt size={18} className="text-green-600" />
                           <span className="text-xs font-bold uppercase tracking-wide text-green-700">Payment</span>
                         </div>
                         
                         <div className="space-y-2 text-sm">
-                          <div className="rounded-lg bg-gradient-to-r from-green-100 to-emerald-100 px-3 py-2.5 shadow-sm">
-                            <div className="text-xs font-semibold text-green-700">Total Amount</div>
-                            <div className="mt-1 text-xl font-bold text-green-800">₹{booking.amount.toLocaleString()}</div>
+                          {/* Total Amount with Flexbox */}
+                          <div className="rounded-lg bg-gradient-to-r from-green-100 to-emerald-100 px-3 py-2.5 shadow-sm overflow-hidden">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                              <div className="text-xs font-semibold text-green-700">Total Amount</div>
+                              <div className="text-xl font-bold text-green-800 break-all">{formatCurrency(booking.amount)}</div>
+                            </div>
                           </div>
                           
-                          <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                            <div className="text-xs font-semibold text-slate-500">Order ID</div>
-                            <div className="mt-1 text-xs font-mono text-slate-700">{booking.orderId.substring(0, 20)}...</div>
+                          {/* Order ID */}
+                          <div className="rounded-lg bg-white px-3 py-2 shadow-sm overflow-hidden">
+                            <div className="text-xs font-semibold text-slate-500 mb-1">Order ID</div>
+                            <div className="text-xs font-mono text-slate-700 break-all" title={booking.orderId}>
+                              {formatShortValue(booking.orderId)}
+                            </div>
                           </div>
                           
-                          <div className="rounded-lg bg-white px-3 py-2 shadow-sm">
-                            <div className="text-xs font-semibold text-slate-500">Payment ID</div>
-                            <div className="mt-1 text-xs font-mono text-slate-700">{booking.paymentId.substring(0, 20)}...</div>
+                          {/* Payment ID */}
+                          <div className="rounded-lg bg-white px-3 py-2 shadow-sm overflow-hidden">
+                            <div className="text-xs font-semibold text-slate-500 mb-1">Payment ID</div>
+                            <div className="text-xs font-mono text-slate-700 break-all" title={booking.paymentId}>
+                              {formatShortValue(booking.paymentId)}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -482,35 +792,52 @@ export default function Bookinghistory() {
                     <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <div className="text-xs font-semibold text-slate-500 mb-2">Passengers ({booking.passengers.length})</div>
                       <div className="space-y-1">
-                        {booking.passengers.map((passenger, index) => (
-                          <div key={`${passenger.email}-${index}`} className="text-xs text-slate-700">
-                            <span className="font-semibold">{passenger.name}</span> • {passenger.phone}
-                          </div>
-                        ))}
+                        {booking.passengers.length > 0 ? (
+                          booking.passengers.map((passenger, index) => (
+                            <div key={`${passenger.email}-${index}`} className="text-xs text-slate-700">
+                              <span className="font-semibold">{getDisplayValue(passenger.name, 'Unnamed passenger')}</span> • {getDisplayValue(passenger.phone, 'No phone available')}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="text-xs text-slate-600">No passenger data available</div>
+                        )}
                       </div>
                     </div>
 
                     {/* Action Buttons */}
                     <div className="mt-6 flex flex-wrap gap-2 border-t-2 border-dashed border-slate-200 pt-4">
+                      {/* Show Confirm button only if status is NOT 'confirmed' */}
+                      {booking.status !== 'confirmed' && (
+                        <button
+                          onClick={() => updateStatus(booking._id, 'confirmed')}
+                          className="group flex items-center gap-2 rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-2.5 text-sm font-bold text-emerald-700 shadow-sm transition-all hover:shadow-md active:scale-95"
+                        >
+                          <CheckCircle2 size={16} />
+                          Confirm Booking
+                        </button>
+                      )}
+                      
+                      {/* Show Cancel button only if status is NOT 'cancelled' */}
+                      {booking.status !== 'cancelled' && (
+                        <button
+                          onClick={() => updateStatus(booking._id, 'cancelled')}
+                          className="group flex items-center gap-2 rounded-xl border-2 border-rose-300 bg-gradient-to-r from-rose-50 to-red-50 px-4 py-2.5 text-sm font-bold text-rose-700 shadow-sm transition-all hover:shadow-md active:scale-95"
+                        >
+                          <XCircle size={16} />
+                          Cancel Booking
+                        </button>
+                      )}
+                      
+                      {/* Download Receipt button always visible */}
                       <button
-                        onClick={() => updateStatus(booking._id, 'confirmed')}
-                        className="group flex items-center gap-2 rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-2.5 text-sm font-bold text-emerald-700 shadow-sm transition-all hover:shadow-md active:scale-95"
-                      >
-                        <CheckCircle2 size={16} />
-                        Confirm Booking
-                      </button>
-                      <button
-                        onClick={() => updateStatus(booking._id, 'cancelled')}
-                        className="group flex items-center gap-2 rounded-xl border-2 border-rose-300 bg-gradient-to-r from-rose-50 to-red-50 px-4 py-2.5 text-sm font-bold text-rose-700 shadow-sm transition-all hover:shadow-md active:scale-95"
-                      >
-                        <XCircle size={16} />
-                        Cancel Booking
-                      </button>
-                      <button
-                        onClick={() => generateBookingPdf(booking)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          generateBookingPdf(booking);
+                        }}
                         className="group flex items-center gap-2 rounded-xl border-2 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-2.5 text-sm font-bold text-blue-700 shadow-sm transition-all hover:shadow-md active:scale-95"
                       >
-                        <Download size={16} />
+                        <Receipt size={16} />
                         Download Receipt
                       </button>
                     </div>
