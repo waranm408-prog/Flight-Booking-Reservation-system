@@ -36,7 +36,7 @@ const Signup = () => {
             onSubmit: async (values) => {
               try {
                 await api.post('/users/signup', values);
-                alert('Account created successfully! Please login.');
+               
                 navigate('/login');
               } catch (error: any) {
                 const message = error?.response?.data?.message || 'Failed to create account.';

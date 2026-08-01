@@ -319,13 +319,6 @@ export default function AdminBookings() {
 
                     {/* Action Buttons */}
                     <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-200">
-                      {/* Show Confirm button only if status is NOT 'confirmed' */}
-                      {booking.status !== 'confirmed' && (
-                        <button onClick={() => updateStatus(booking._id, 'confirmed')} className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors">
-                          Confirm
-                        </button>
-                      )}
-                      
                       {/* Show Cancel button only if status is NOT 'cancelled' */}
                       {booking.status !== 'cancelled' && (
                         <button onClick={() => updateStatus(booking._id, 'cancelled')} className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-700 transition-colors">

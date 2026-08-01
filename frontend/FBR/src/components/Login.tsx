@@ -36,7 +36,7 @@ const Login = () => {
           localStorage.setItem('authToken', data.token);
           localStorage.setItem('CurrentUser', JSON.stringify(data.user));
           window.dispatchEvent(new Event('auth-state-changed'));
-          alert('Login successful!');
+         
           navigate(isAdmin ? '/admin' : '/');
         } catch (error: any) {
           const message = error?.response?.data?.message || 'Invalid email or password';

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plane, Receipt, XCircle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Plane, Receipt, XCircle } from 'lucide-react';
 import jsPDF from 'jspdf';
 import Navbar from '../components/Navbar';
 import api from '../api/axios';
@@ -806,18 +806,7 @@ export default function Bookinghistory() {
 
                     {/* Action Buttons */}
                     <div className="mt-6 flex flex-wrap gap-2 border-t-2 border-dashed border-slate-200 pt-4">
-                      {/* Show Confirm button only if status is NOT 'confirmed' */}
-                      {booking.status !== 'confirmed' && (
-                        <button
-                          onClick={() => updateStatus(booking._id, 'confirmed')}
-                          className="group flex items-center gap-2 rounded-xl border-2 border-emerald-300 bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-2.5 text-sm font-bold text-emerald-700 shadow-sm transition-all hover:shadow-md active:scale-95"
-                        >
-                          <CheckCircle2 size={16} />
-                          Confirm Booking
-                        </button>
-                      )}
-                      
-                      {/* Show Cancel button only if status is NOT 'cancelled' */}
+                      {/* Show Cancel button only if not already cancelled */}
                       {booking.status !== 'cancelled' && (
                         <button
                           onClick={() => updateStatus(booking._id, 'cancelled')}

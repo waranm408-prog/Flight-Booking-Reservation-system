@@ -113,7 +113,7 @@ router.put('/:id/status', authenticateUser, async function (req, res) {
 
     // Check permissions
     // Admins can update any booking to any status
-    // Regular users can confirm or cancel their own bookings only
+    // Regular users can only cancel their own bookings (NOT confirm)
     if (!isAdmin) {
       // Check if this booking belongs to the current user
       const isOwner = 
@@ -127,10 +127,10 @@ router.put('/:id/status', authenticateUser, async function (req, res) {
         return res.status(403).json({ message: 'You can only update your own bookings.' });
       }
 
-      // Regular users can confirm or cancel their own bookings
-      if (status !== 'cancelled' && status !== 'confirmed') {
-        console.log('Permission denied: User can only confirm or cancel');
-        return res.status(403).json({ message: 'You can only confirm or cancel your own bookings.' });
+      // Regular users can only cancel their bookings, NOT confirm or other statuses
+      if (status !== 'cancelled') {
+        console.log('Permission denied: User can only cancel');
+        return res.status(403).json({ message: 'You can only cancel your own bookings.' });
       }
     }
 
