@@ -25,7 +25,7 @@ const AIRPORT_CODES = {
   pune: 'PNQ',
   ahmedabad: 'AMD',
   jaipur: 'JAI',
-  goa: 'GOI',
+  goa: 'GOI', goi: 'GOI',
   trivandrum: 'TRV', 'thiruvananthapuram': 'TRV',
   lucknow: 'LKO',
   chandigarh: 'IXC',
@@ -44,7 +44,7 @@ const AIRPORT_CODES = {
   leh: 'IXL',
   mangalore: 'IXE',
   coimbatore: 'CJB',
-  tiruchirappalli: 'TRZ',
+  tiruchirappalli: 'TRZ', trichy: 'TRZ',
   vijayawada: 'VGA',
   bhopal: 'BHO',
   jamnagar: 'JAM',
@@ -59,11 +59,84 @@ const AIRPORT_CODES = {
   paris: 'CDG',
   frankfurt: 'FRA',
   doha: 'DOH',
-  'abu dhabi': 'AUH',
+  'abu dhabi': 'AUH', abudhabi: 'AUH',
   dublin: 'DUB',
   rome: 'FCO',
   madrid: 'MAD',
   istanbul: 'IST',
+};
+
+// Reverse mapping: Airport Code -> City Name (for display)
+const AIRPORT_TO_CITY = {
+  'MAA': 'Chennai',
+  'BLR': 'Bangalore',
+  'DEL': 'Delhi',
+  'BOM': 'Mumbai',
+  'HYD': 'Hyderabad',
+  'CCU': 'Kolkata',
+  'COK': 'Kochi',
+  'PNQ': 'Pune',
+  'AMD': 'Ahmedabad',
+  'JAI': 'Jaipur',
+
+  'TRV': 'Trivandrum',
+  'LKO': 'Lucknow',
+  'IXC': 'Chandigarh',
+  'ATQ': 'Amritsar',
+  'STV': 'Surat',
+  'VTZ': 'Visakhapatnam',
+  'BBI': 'Bhubaneswar',
+  'IDR': 'Indore',
+  'NAG': 'Nagpur',
+  'RPR': 'Raipur',
+  'GAU': 'Guwahati',
+  'PAT': 'Patna',
+  'KNU': 'Kanpur',
+  'SXR': 'Srinagar',
+  'IXJ': 'Jammu',
+  'IXL': 'Leh',
+  'IXE': 'Mangalore',
+  'CJB': 'Coimbatore',
+  'TRZ': 'Tiruchirappalli',
+  'VGA': 'Vijayawada',
+  'BHO': 'Bhopal',
+  'JAM': 'Jamnagar',
+  'RAJ': 'Rajkot',
+  'SIN': 'Singapore',
+  'DXB': 'Dubai',
+  'LHR': 'London',
+  'JFK': 'New York',
+  'YYZ': 'Toronto',
+  'SYD': 'Sydney',
+  'MEL': 'Melbourne',
+  'CDG': 'Paris',
+  'FRA': 'Frankfurt',
+  'DOH': 'Doha',
+  'AUH': 'Abu Dhabi',
+  'DUB': 'Dublin',
+  'FCO': 'Rome',
+  'MAD': 'Madrid',
+  'IST': 'Istanbul',
+};
+
+// Popular flight routes - cities that commonly have flights between them
+const COMMON_ROUTES = {
+  // Major Indian cities - well connected
+  'Chennai': ['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune', 'Goa', 'Dubai', 'Singapore'],
+  'Bangalore': ['Chennai', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune', 'Goa', 'Dubai', 'Singapore'],
+  'Mumbai': ['Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Pune', 'Goa', 'Ahmedabad', 'Dubai', 'Singapore', 'London', 'New York'],
+  'Delhi': ['Mumbai', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Jaipur', 'Chandigarh', 'Goa', 'Dubai', 'Singapore', 'London', 'New York'],
+  'Hyderabad': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Pune', 'Goa', 'Dubai'],
+  'Kolkata': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Guwahati', 'Bhubaneswar'],
+  'Kochi': ['Bangalore', 'Chennai', 'Mumbai', 'Delhi', 'Dubai', 'Singapore'],
+  'Pune': ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Goa'],
+  'Goa': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata'],
+  'Ahmedabad': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'],
+  'Jaipur': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'],
+  'Dubai': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Kochi', 'London', 'Singapore'],
+  'Singapore': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Kochi', 'Dubai', 'Sydney', 'Melbourne'],
+  'London': ['Mumbai', 'Delhi', 'Dubai', 'New York', 'Paris', 'Frankfurt', 'Dublin'],
+  'New York': ['Mumbai', 'Delhi', 'London', 'Toronto', 'Dubai'],
 };
 
 const AIRLINE_NAMES = {
@@ -106,6 +179,12 @@ function getAirlineName(code) {
 function getAirlineLogo(code) {
   if (!code) return 'https://placehold.co/40?text=✈️';
   return `https://images.kiwi.com/airlines/64/${String(code).trim().toUpperCase()}.png`;
+}
+
+function getCityName(airportCode) {
+  if (!airportCode) return '';
+  const normalized = String(airportCode).trim().toUpperCase();
+  return AIRPORT_TO_CITY[normalized] || normalized;
 }
 
 function parseFlightDateTime(value, referenceDate) {
@@ -549,70 +628,6 @@ async function fetchLiveFlights(from, to, cabinClass, departureDate, useFallback
     console.log('⚠️ AIRLABS_API_KEY not configured');
   }
 
-  // Try Amadeus API (best for flight shopping)
-  if (AMADEUS_API_KEY && AMADEUS_API_SECRET && destinationCode) {
-    console.log('🔵 Attempting Amadeus API...');
-    const amadeusFlights = await fetchAmadeusFlights(from, to, cabinClass, departureDate);
-    if (amadeusFlights.length > 0) {
-      console.log(`✅ Found ${amadeusFlights.length} flights from Amadeus`);
-      console.log('═══════════════════════════════════════════');
-      return amadeusFlights;
-    }
-  }
-
-  // Try AviationStack API
-  if (AVIATIONSTACK_API_KEY) {
-    console.log('🟡 Attempting AviationStack API...');
-    const aviationStackFlights = await fetchAviationStackFlights(from, to, cabinClass, departureDate);
-    if (aviationStackFlights.length > 0) {
-      console.log(`✅ Found ${aviationStackFlights.length} flights from AviationStack`);
-      console.log('═══════════════════════════════════════════');
-      return aviationStackFlights;
-    }
-  }
-
-  // Try FlightAware API
-  if (FLIGHTAWARE_API_KEY) {
-    console.log('🟢 Attempting FlightAware API...');
-    try {
-      const response = await axios.get(`${FLIGHTAWARE_BASE_URL}/airports/${originCode}/flights/departures`, {
-        headers: {
-          'x-apikey': FLIGHTAWARE_API_KEY,
-          Accept: 'application/json',
-        },
-        params: {
-          max_results: 15,
-        },
-      });
-
-      const payload = response.data || {};
-      const rawFlights = Array.isArray(payload?.flights)
-        ? payload.flights
-        : Array.isArray(payload?.departures)
-          ? payload.departures
-          : Array.isArray(payload?.results)
-            ? payload.results
-            : [];
-
-      let flights = rawFlights
-        .filter((item) => {
-          if (!destinationCode) return true;
-          const destinationValue = item.destination?.code || item.destination?.airport_code || item.destination || '';
-          return String(destinationValue).toUpperCase() === destinationCode;
-        })
-        .slice(0, 10)
-        .map((item) => mapFlightAwareFlight(item, originCode, destinationCode || 'N/A', cabinClass));
-
-      if (flights.length > 0) {
-        console.log(`✅ Found ${flights.length} flights from FlightAware`);
-        console.log('═══════════════════════════════════════════');
-        return flights;
-      }
-    } catch (error) {
-      console.error('❌ FlightAware API error:', error.message);
-    }
-  }
-
   console.log('❌ No live flight data available from any API');
   console.log('⚠️ All API sources returned no flights or are not configured');
   console.log('💡 Please check your API keys in .env file');
@@ -621,6 +636,52 @@ async function fetchLiveFlights(from, to, cabinClass, departureDate, useFallback
   // Return empty array instead of fallback data
   return [];
 }
+
+// New endpoint: Get available destinations based on origin
+router.get('/available-destinations', function (req, res) {
+  try {
+    const from = (req.query.from || '').toString().trim();
+    
+    if (!from) {
+      return res.json({ 
+        destinations: [],
+        message: 'Please provide an origin city'
+      });
+    }
+
+    // Get the city name with proper capitalization
+    const originCode = getAirportCode(from);
+    const originCity = originCode ? getCityName(originCode) : from;
+
+    // Get available destinations for this origin
+    const availableDestinations = COMMON_ROUTES[originCity] || [];
+
+    // If no specific routes defined, return common destinations
+    const defaultDestinations = [
+      'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 
+      'Kolkata', 'Pune', 'Goa', 'Kochi', 'Ahmedabad'
+    ];
+
+    const destinations = availableDestinations.length > 0 
+      ? availableDestinations 
+      : defaultDestinations.filter(dest => dest !== originCity);
+
+    res.json({ 
+      from: originCity,
+      destinations,
+      count: destinations.length,
+      message: destinations.length > 0 
+        ? `Found ${destinations.length} destinations from ${originCity}` 
+        : 'No specific routes defined for this origin'
+    });
+  } catch (error) {
+    console.error('Failed to get available destinations:', error);
+    res.status(500).json({ 
+      destinations: [],
+      message: error.message || 'Failed to get destinations.' 
+    });
+  }
+});
 
 router.get('/', async function (req, res) {
   try {
@@ -652,7 +713,33 @@ router.get('/search', async function (req, res) {
     if (!from || !to) {
       return res.status(400).json({ 
         message: 'Origin and destination are required.',
-        flights: []
+        flights: [],
+        outboundFlights: [],
+        returnFlights: []
+      });
+    }
+
+    // Validate airport codes
+    const originCode = getAirportCode(from);
+    const destinationCode = getAirportCode(to);
+
+    if (!originCode) {
+      return res.status(400).json({
+        message: `Invalid departure location: "${from}". Please select a valid city from the suggestions.`,
+        flights: [],
+        outboundFlights: [],
+        returnFlights: [],
+        error: 'INVALID_ORIGIN'
+      });
+    }
+
+    if (!destinationCode) {
+      return res.status(400).json({
+        message: `Invalid destination: "${to}". Please select a valid city from the suggestions.`,
+        flights: [],
+        outboundFlights: [],
+        returnFlights: [],
+        error: 'INVALID_DESTINATION'
       });
     }
 
@@ -660,19 +747,59 @@ router.get('/search', async function (req, res) {
 
     if (tripType === 'round-trip' && returnDate) {
       const returnFlights = await fetchLiveFlights(to, from, cabinClass, returnDate, false);
+      
+      // Check if either leg has no flights
+      if (outboundFlights.length === 0 && returnFlights.length === 0) {
+        return res.json({
+          outboundFlights: [],
+          returnFlights: [],
+          flights: [],
+          message: `No flights available for the route ${getCityName(originCode)} (${originCode}) to ${getCityName(destinationCode)} (${destinationCode}) on the selected dates. This route may not be serviced or flights may have already departed.`,
+          dataSource: 'none',
+          error: 'NO_FLIGHTS_BOTH_LEGS'
+        });
+      }
+
+      if (outboundFlights.length === 0) {
+        return res.json({
+          outboundFlights: [],
+          returnFlights,
+          flights: [],
+          message: `No outbound flights available from ${getCityName(originCode)} to ${getCityName(destinationCode)} on ${departureDate}. Return flights are available.`,
+          dataSource: returnFlights.length > 0 ? 'live' : 'none',
+          error: 'NO_OUTBOUND_FLIGHTS'
+        });
+      }
+
+      if (returnFlights.length === 0) {
+        return res.json({
+          outboundFlights,
+          returnFlights: [],
+          flights: outboundFlights,
+          message: `No return flights available from ${getCityName(destinationCode)} to ${getCityName(originCode)} on ${returnDate}. Outbound flights are available.`,
+          dataSource: 'live',
+          error: 'NO_RETURN_FLIGHTS'
+        });
+      }
+
       return res.json({
         outboundFlights,
         returnFlights,
         flights: outboundFlights,
-        dataSource: outboundFlights.length > 0 ? 'live' : 'none',
+        dataSource: 'live',
+        count: outboundFlights.length,
+        returnCount: returnFlights.length
       });
     }
 
     if (outboundFlights.length === 0) {
       return res.json({ 
         flights: [],
-        message: 'No live flights available for this route. Please try a different date or route.',
-        dataSource: 'none'
+        outboundFlights: [],
+        returnFlights: [],
+        message: `No flights available for the route ${getCityName(originCode)} (${originCode}) to ${getCityName(destinationCode)} (${destinationCode})${departureDate ? ' on ' + departureDate : ''}. This route may not be serviced, or all flights for today may have already departed. Please try a different date or route.`,
+        dataSource: 'none',
+        error: 'NO_FLIGHTS_AVAILABLE'
       });
     }
 
@@ -691,3 +818,5 @@ router.get('/search', async function (req, res) {
 
 module.exports = router;
 module.exports.fetchLiveFlights = fetchLiveFlights;
+module.exports.getCityName = getCityName;
+module.exports.getAirportCode = getAirportCode;

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFormik } from "formik";
 import { useNavigate } from "react-router-dom";
 import { Calendar, MapPin } from "lucide-react";
+import api from "../api/axios";
 
 import Navbar from "../components/Navbar";
 
@@ -19,6 +20,7 @@ export default function Home() {
   const navigate = useNavigate();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
+  const [availableDestinations, setAvailableDestinations] = useState<string[]>([]);
 
   const formik = useFormik({
     initialValues: {
@@ -46,17 +48,40 @@ export default function Home() {
       return;
     }
 
-    const filtered = locationSuggestions.filter((location) =>
+    // For 'to' field, prioritize available destinations if 'from' is selected
+    let suggestionsToShow = locationSuggestions;
+    
+    if (name === 'toLocation' && formik.values.fromLocation && availableDestinations.length > 0) {
+      suggestionsToShow = availableDestinations;
+    }
+
+    const filtered = suggestionsToShow.filter((location) =>
       location.toLowerCase().includes(value.toLowerCase())
     );
 
-    setSuggestions(filtered.slice(0, 6));
+    setSuggestions(filtered.slice(0, 8));
     setActiveField(name === 'fromLocation' ? 'from' : 'to');
   };
 
-  const selectSuggestion = (location: string) => {
+  const selectSuggestion = async (location: string) => {
     if (activeField === 'from') {
       formik.setFieldValue('fromLocation', location);
+      
+      // Fetch available destinations when origin is selected
+      try {
+        const response = await api.get('/flights/available-destinations', {
+          params: { from: location }
+        });
+        
+        if (response.data?.destinations && response.data.destinations.length > 0) {
+          setAvailableDestinations(response.data.destinations);
+        } else {
+          setAvailableDestinations([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch available destinations:', error);
+        setAvailableDestinations([]);
+      }
     } else if (activeField === 'to') {
       formik.setFieldValue('toLocation', location);
     }

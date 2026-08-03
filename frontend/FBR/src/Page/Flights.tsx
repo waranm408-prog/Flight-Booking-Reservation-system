@@ -29,7 +29,7 @@ interface Flights {
 
 const locationSuggestions = [
   'Chennai', 'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune',
-  'Ahmedabad', 'Jaipur', 'Goa', 'Trivandrum', 'Lucknow', 'Chandigarh', 'Amritsar',
+  'Ahmedabad', 'Jaipur', 'Trivandrum', 'maduri','Lucknow', 'Chandigarh', 'Amritsar',
   'Surat', 'Visakhapatnam', 'Bhubaneswar', 'Indore', 'Nagpur', 'Raipur', 'Guwahati',
   'Patna', 'Kanpur', 'Srinagar', 'Jammu', 'Leh', 'Mangalore', 'Coimbatore',
   'Tiruchirappalli', 'Vijayawada', 'Bhopal', 'Jamnagar', 'Rajkot', 'Singapore',
@@ -90,6 +90,7 @@ function Flights() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
   const [swapping, setSwapping] = useState(false);
+  const [availableDestinations, setAvailableDestinations] = useState<string[]>([]);
 
   const [hasHydratedSearch, setHasHydratedSearch] = useState(false);
   const [searchParams] = useSearchParams();
@@ -184,24 +185,43 @@ function Flights() {
 
         const outboundFlights: Flights[] = searchResponse.data?.outboundFlights || searchResponse.data?.flights || [];
         const inboundFlights: Flights[] = searchResponse.data?.returnFlights || [];
+        const apiMessage = searchResponse.data?.message || '';
+        const apiError = searchResponse.data?.error || '';
 
         setSelectedOutboundFlight(null);
         setSelectedReturnFlight(null);
 
-        if (outboundFlights.length === 0) {
+        // Handle specific error cases from backend
+        if (apiError === 'INVALID_ORIGIN' || apiError === 'INVALID_DESTINATION') {
           setFlights([]);
           setReturnFlights([]);
-          setError("No flights found for the selected route.");
+          setError(apiMessage || "Invalid location selected. Please choose from the suggested cities.");
+        } else if (outboundFlights.length === 0 && inboundFlights.length === 0) {
+          setFlights([]);
+          setReturnFlights([]);
+          setError(apiMessage || "No flights found for the selected route. This route may not be serviced or flights may have departed.");
+        } else if (values.tripType === 'round-trip') {
+          // For round trip, show flights even if one leg is missing
+          setFlights([...outboundFlights]);
+          setReturnFlights([...inboundFlights]);
+          if (apiMessage && (outboundFlights.length === 0 || inboundFlights.length === 0)) {
+            setError(apiMessage); // Show partial availability message
+          } else {
+            setError("");
+          }
         } else {
           setFlights([...outboundFlights]);
-          setReturnFlights(values.tripType === 'round-trip' ? [...inboundFlights] : []);
+          setReturnFlights([]);
           setError("");
         }
       } catch (err) {
         console.error('Flight fetch error:', err);
+        const errorResponse = (err as any)?.response?.data;
+        const errorMessage = errorResponse?.message || "Failed to fetch flights. Please try again later.";
+        
         setFlights([]);
         setReturnFlights([]);
-        setError("Failed to fetch flights. Please try again later.");
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -218,17 +238,47 @@ function Flights() {
       return;
     }
 
-    const filtered = locationSuggestions.filter((location) =>
+    // For 'to' field, prioritize available destinations if 'from' is selected
+    let suggestionsToShow = locationSuggestions;
+    
+    if (name === 'toLocation' && formik.values.fromLocation && availableDestinations.length > 0) {
+      // Filter available destinations first
+      const availableFiltered = availableDestinations.filter((location) =>
+        location.toLowerCase().includes(value.toLowerCase())
+      );
+
+      // Prioritize available destinations, but show all if no matches
+      suggestionsToShow = availableFiltered.length > 0 ? availableDestinations : locationSuggestions;
+    }
+
+    const filtered = suggestionsToShow.filter((location) =>
       location.toLowerCase().includes(value.toLowerCase())
     );
 
-    setSuggestions(filtered.slice(0, 6));
+    setSuggestions(filtered.slice(0, 8)); // Show up to 8 suggestions
     setActiveField(name === 'fromLocation' ? 'from' : 'to');
   };
 
-  const selectSuggestion = (location: string) => {
+  const selectSuggestion = async (location: string) => {
     if (activeField === 'from') {
       formik.setFieldValue('fromLocation', location);
+      
+      // Fetch available destinations when origin is selected
+      try {
+        const response = await api.get('/flights/available-destinations', {
+          params: { from: location }
+        });
+        
+        if (response.data?.destinations && response.data.destinations.length > 0) {
+          setAvailableDestinations(response.data.destinations);
+          console.log(`✈️ Available destinations from ${location}:`, response.data.destinations);
+        } else {
+          setAvailableDestinations([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch available destinations:', error);
+        setAvailableDestinations([]);
+      }
     } else if (activeField === 'to') {
       formik.setFieldValue('toLocation', location);
     }
@@ -556,12 +606,17 @@ function Flights() {
               <label className="text-xs text-slate-500 font-semibold flex items-center gap-1 mb-1">
                 <MapPin size={14} className="text-slate-400" />
                 Where To?
+                {availableDestinations.length > 0 && formik.values.fromLocation && (
+                  <span className="ml-auto text-xs text-green-600 font-semibold">
+                    ✓ {availableDestinations.length} routes
+                  </span>
+                )}
               </label>
               <div className="relative">
                 <input
                   type="text"
                   name="toLocation"
-                  placeholder="Destination (e.g., Bangalore)"
+                  placeholder={availableDestinations.length > 0 ? "Select from available destinations" : "Destination (e.g., Bangalore)"}
                   value={formik.values.toLocation}
                   onChange={handleLocationChange}
                   onBlur={formik.handleBlur}
@@ -571,16 +626,38 @@ function Flights() {
                   required
                 />
                 {activeField === 'to' && suggestions.length > 0 ? (
-                  <ul className="absolute z-20 mt-2 max-h-44 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-                    {suggestions.map((location) => (
-                      <li
-                        key={location}
-                        className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-                        onClick={() => selectSuggestion(location)}
-                      >
-                        {location}
+                  <ul className="absolute z-20 mt-2 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    {formik.values.fromLocation && availableDestinations.length > 0 && (
+                      <li className="px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 border-b border-green-200 sticky top-0">
+                        ✈️ Available routes from {formik.values.fromLocation}
                       </li>
-                    ))}
+                    )}
+                    {suggestions.map((location) => {
+                      const isAvailable = availableDestinations.includes(location);
+                      const isFromOrigin = formik.values.fromLocation && availableDestinations.length > 0;
+                      
+                      return (
+                        <li
+                          key={location}
+                          className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
+                            isFromOrigin && isAvailable
+                              ? 'text-green-700 font-semibold bg-green-50 hover:bg-green-100'
+                              : 'text-slate-700 hover:bg-slate-100'
+                          }`}
+                          onClick={() => selectSuggestion(location)}
+                        >
+                          <span className="flex items-center gap-2">
+                            {isFromOrigin && isAvailable && (
+                              <span className="text-green-600">✓</span>
+                            )}
+                            {location}
+                            {isFromOrigin && isAvailable && (
+                              <span className="ml-auto text-xs text-green-600">Common route</span>
+                            )}
+                          </span>
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
               </div>
@@ -699,16 +776,27 @@ function Flights() {
           )}
 
           {(error || authError) && (
-            <div className={`rounded-xl p-4 text-center font-medium ${authError ? 'bg-amber-50 border border-amber-200 text-amber-800' : 'bg-red-50 border border-red-200 text-red-600'}`}>
-              {authError || error}
+            <div className={`rounded-xl p-5 text-center ${authError ? 'bg-amber-50 border-2 border-amber-300' : 'bg-red-50 border-2 border-red-300'}`}>
+              <div className="text-3xl mb-3">{authError ? '⚠️' : '❌'}</div>
+              <p className="font-semibold text-slate-800 mb-2">
+                {authError ? 'Authentication Required' : 'Flights not Avaliable'}
+              </p>
+              <p className={`text-sm ${authError ? 'text-amber-700' : 'text-red-700'}`}>
+                {authError || error}
+              </p>
+              {!authError && (
+                <div className="mt-4 text-xs text-slate-600">
+                 
+                </div>
+              )}
             </div>
           )}
 
           {!loading && !error && !authError && flights.length === 0 && formik.values.fromLocation && formik.values.toLocation && (
-            <div className="rounded-xl p-6 text-center bg-slate-50 border border-slate-200">
-              <div className="text-4xl mb-3">✈️</div>
-              <h3 className="text-lg font-bold text-slate-700 mb-2">No Flights Available</h3>
-              <p className="text-slate-600">
+            <div className="rounded-xl p-6 text-center bg-gradient-to-br from-slate-50 to-blue-50 border-2 border-slate-200">
+              <div className="text-5xl mb-4">🛫</div>
+              <h3 className="text-xl font-bold text-slate-800 mb-3">No Flights Available</h3>
+              <p className="text-slate-700 mb-4 max-w-2xl mx-auto">
                 {(() => {
                   const searchDate = parseDateOnly(formik.values.departureDate);
                   const today = new Date();
@@ -716,11 +804,32 @@ function Flights() {
                   searchDate.setHours(0, 0, 0, 0);
                   
                   if (searchDate.getTime() === today.getTime()) {
-                    return "All flights for today have departed. Please try searching for tomorrow or another date.";
+                    return `All flights from ${formik.values.fromLocation} to ${formik.values.toLocation} for today have departed. Please try searching for tomorrow or another date.`;
                   }
                   return `No flights found for the route ${formik.values.fromLocation} to ${formik.values.toLocation} on ${formatDisplayDate(formik.values.departureDate)}.`;
                 })()}
               </p>
+              <div className="mt-5 p-4 bg-white rounded-lg border border-blue-200 max-w-xl mx-auto">
+                <p className="text-sm font-semibold text-blue-700 mb-2">💡 What you can try:</p>
+                <ul className="text-sm text-slate-600 space-y-2 text-left">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 mt-0.5">•</span>
+                    <span><strong>Try a different date:</strong> Select tomorrow or another day</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 mt-0.5">•</span>
+                    <span><strong>Check major routes:</strong> Try popular destinations like Mumbai, Delhi, Bangalore</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 mt-0.5">•</span>
+                    <span><strong>Verify locations:</strong> Make sure both cities are spelled correctly and selected from the dropdown</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 mt-0.5">•</span>
+                    <span><strong>Route may not be serviced:</strong> Some city pairs may not have direct flights available</span>
+                  </li>
+                </ul>
+              </div>
             </div>
           )}
 
