@@ -25,7 +25,8 @@ const AIRPORT_CODES = {
   pune: 'PNQ',
   ahmedabad: 'AMD',
   jaipur: 'JAI',
-  goa: 'GOI', goi: 'GOI',
+  goa: 'GOI', 'dabolim': 'GOI',
+
   trivandrum: 'TRV', 'thiruvananthapuram': 'TRV',
   lucknow: 'LKO',
   chandigarh: 'IXC',
@@ -78,6 +79,7 @@ const AIRPORT_TO_CITY = {
   'PNQ': 'Pune',
   'AMD': 'Ahmedabad',
   'JAI': 'Jaipur',
+  'GOI': 'Goa',
 
   'TRV': 'Trivandrum',
   'LKO': 'Lucknow',
@@ -130,7 +132,8 @@ const COMMON_ROUTES = {
   'Kolkata': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Guwahati', 'Bhubaneswar'],
   'Kochi': ['Bangalore', 'Chennai', 'Mumbai', 'Delhi', 'Dubai', 'Singapore'],
   'Pune': ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Goa'],
-  'Goa': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune', 'Kolkata'],
+  'Goa': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune'],
+ 
   'Ahmedabad': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'],
   'Jaipur': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'],
   'Dubai': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Kochi', 'London', 'Singapore'],

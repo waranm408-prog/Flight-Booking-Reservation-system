@@ -8,7 +8,7 @@ import Navbar from "../components/Navbar";
 
 const locationSuggestions = [
   'Chennai', 'Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune',
-  'Ahmedabad', 'Jaipur', 'Goa', 'Trivandrum', 'Lucknow', 'Chandigarh', 'Amritsar',
+  'Ahmedabad', 'Jaipur', 'Trivandrum', 'Lucknow', 'Chandigarh', 'Amritsar',
   'Surat', 'Visakhapatnam', 'Bhubaneswar', 'Indore', 'Nagpur', 'Raipur', 'Guwahati',
   'Patna', 'Kanpur', 'Srinagar', 'Jammu', 'Leh', 'Mangalore', 'Coimbatore',
   'Tiruchirappalli', 'Vijayawada', 'Bhopal', 'Jamnagar', 'Rajkot', 'Singapore',
