@@ -25,7 +25,7 @@ const AIRPORT_CODES = {
   pune: 'PNQ',
   ahmedabad: 'AMD',
   jaipur: 'JAI',
-  goa: 'GOI', 'dabolim': 'GOI',
+
 
   trivandrum: 'TRV', 'thiruvananthapuram': 'TRV',
   lucknow: 'LKO',
@@ -79,7 +79,6 @@ const AIRPORT_TO_CITY = {
   'PNQ': 'Pune',
   'AMD': 'Ahmedabad',
   'JAI': 'Jaipur',
-  'GOI': 'Goa',
 
   'TRV': 'Trivandrum',
   'LKO': 'Lucknow',
@@ -124,15 +123,14 @@ const AIRPORT_TO_CITY = {
 // Popular flight routes - cities that commonly have flights between them
 const COMMON_ROUTES = {
   // Major Indian cities - well connected
-  'Chennai': ['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune', 'Goa', 'Dubai', 'Singapore'],
-  'Bangalore': ['Chennai', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune', 'Goa', 'Dubai', 'Singapore'],
-  'Mumbai': ['Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Pune', 'Goa', 'Ahmedabad', 'Dubai', 'Singapore', 'London', 'New York'],
-  'Delhi': ['Mumbai', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Jaipur', 'Chandigarh', 'Goa', 'Dubai', 'Singapore', 'London', 'New York'],
-  'Hyderabad': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Pune', 'Goa', 'Dubai'],
+  'Chennai': ['Bangalore', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune', 'Dubai', 'Singapore'],
+  'Bangalore': ['Chennai', 'Mumbai', 'Delhi', 'Hyderabad', 'Kolkata', 'Kochi', 'Pune', 'Dubai', 'Singapore'],
+  'Mumbai': ['Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Pune', 'Ahmedabad', 'Dubai', 'Singapore', 'London', 'New York'],
+  'Delhi': ['Mumbai', 'Bangalore', 'Chennai', 'Hyderabad', 'Kolkata', 'Jaipur', 'Chandigarh', 'Dubai', 'Singapore', 'London', 'New York'],
+  'Hyderabad': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Kolkata', 'Pune', 'Dubai'],
   'Kolkata': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Guwahati', 'Bhubaneswar'],
   'Kochi': ['Bangalore', 'Chennai', 'Mumbai', 'Delhi', 'Dubai', 'Singapore'],
-  'Pune': ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad', 'Goa'],
-  'Goa': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 'Pune'],
+  'Pune': ['Mumbai', 'Delhi', 'Bangalore', 'Hyderabad'],
  
   'Ahmedabad': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'],
   'Jaipur': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'],
@@ -188,6 +186,24 @@ function getCityName(airportCode) {
   if (!airportCode) return '';
   const normalized = String(airportCode).trim().toUpperCase();
   return AIRPORT_TO_CITY[normalized] || normalized;
+}
+
+function getDisplayLocationName(value, fallback = '') {
+  if (!value) return fallback || '';
+
+  const text = String(value).trim();
+  if (!text) return fallback || '';
+
+  const normalized = text.toUpperCase();
+  if (AIRPORT_TO_CITY[normalized]) return AIRPORT_TO_CITY[normalized];
+
+  const codeFromAlias = getAirportCode(text);
+  if (codeFromAlias) {
+    const cityName = getCityName(codeFromAlias);
+    if (cityName && cityName !== codeFromAlias) return cityName;
+  }
+
+  return fallback || text;
 }
 
 function parseFlightDateTime(value, referenceDate) {
@@ -390,6 +406,58 @@ function mapFlightAwareFlight(item, originCode, destinationCode, cabinClass) {
 //     return [];
 //   }
 // }
+
+function buildFallbackFlights(from, to, cabinClass, departureDate) {
+  const originCode = getAirportCode(from) || 'MAA';
+  const destinationCode = getAirportCode(to) || 'BLR';
+  const originName = getDisplayLocationName(originCode || from, from);
+  const destinationName = getDisplayLocationName(destinationCode || to, to);
+  const baseDate = departureDate ? new Date(departureDate) : new Date();
+  baseDate.setHours(0, 0, 0, 0);
+
+  const sampleSchedules = [
+    { dep: '06:20', arr: '08:10', airline: 'IndiGo', flightNo: '6E201', duration: '1h 50m', priceMultiplier: 1.0 },
+    { dep: '09:45', arr: '11:35', airline: 'Air India', flightNo: 'AI512', duration: '1h 50m', priceMultiplier: 1.12 },
+    { dep: '14:15', arr: '16:05', airline: 'SpiceJet', flightNo: 'SG308', duration: '1h 50m', priceMultiplier: 1.08 },
+  ];
+
+  return sampleSchedules.map((schedule, index) => {
+    const depDateTime = new Date(baseDate);
+    const arrDateTime = new Date(baseDate);
+    const [depHours, depMinutes] = schedule.dep.split(':').map(Number);
+    const [arrHours, arrMinutes] = schedule.arr.split(':').map(Number);
+
+    depDateTime.setHours(depHours, depMinutes, 0, 0);
+    arrDateTime.setHours(arrHours, arrMinutes, 0, 0);
+    if (arrDateTime <= depDateTime) {
+      arrDateTime.setDate(arrDateTime.getDate() + 1);
+    }
+
+    const basePrice = buildPrice(originCode, destinationCode, cabinClass);
+    const basePriceNum = Number(basePrice.replace(/[^0-9]/g, '')) || 8000;
+    const finalPrice = Math.max(1000, Math.floor(basePriceNum * schedule.priceMultiplier));
+
+    return {
+      id: `fallback-${originCode}-${destinationCode}-${index + 1}`,
+      airline: schedule.airline,
+      logo: '',
+      departureTime: formatTo12Hour(depDateTime),
+      arrivalTime: formatTo12Hour(arrDateTime),
+      departureDateTime: depDateTime.toISOString(),
+      arrivalDateTime: arrDateTime.toISOString(),
+      departureDate: depDateTime.toISOString(),
+      arrivalDate: arrDateTime.toISOString(),
+      duration: schedule.duration,
+      stops: 0,
+      price: `₹${finalPrice}`,
+      cabinClass: cabinClass || 'Economy',
+      origin: originName,
+      destination: destinationName,
+      flightNo: schedule.flightNo,
+      dataSource: 'fallback',
+    };
+  });
+}
 
 // Fetch from AirLabs API (Real-time flight data)
 async function fetchAirLabsFlights(from, to, cabinClass, departureDate) {
@@ -633,11 +701,10 @@ async function fetchLiveFlights(from, to, cabinClass, departureDate, useFallback
 
   console.log('❌ No live flight data available from any API');
   console.log('⚠️ All API sources returned no flights or are not configured');
-  console.log('💡 Please check your API keys in .env file');
+  console.log('💡 Returning a sample route list so the app remains usable without live API keys');
   console.log('═══════════════════════════════════════════');
-  
-  // Return empty array instead of fallback data
-  return [];
+
+  return buildFallbackFlights(from, to, cabinClass, departureDate);
 }
 
 // New endpoint: Get available destinations based on origin
@@ -662,7 +729,7 @@ router.get('/available-destinations', function (req, res) {
     // If no specific routes defined, return common destinations
     const defaultDestinations = [
       'Mumbai', 'Delhi', 'Bangalore', 'Chennai', 'Hyderabad', 
-      'Kolkata', 'Pune', 'Goa', 'Kochi', 'Ahmedabad'
+      'Kolkata', 'Pune', 'Kochi', 'Ahmedabad'
     ];
 
     const destinations = availableDestinations.length > 0 

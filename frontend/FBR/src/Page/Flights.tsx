@@ -605,18 +605,13 @@ function Flights() {
             }`}>
               <label className="text-xs text-slate-500 font-semibold flex items-center gap-1 mb-1">
                 <MapPin size={14} className="text-slate-400" />
-                Where To?
-                {availableDestinations.length > 0 && formik.values.fromLocation && (
-                  <span className="ml-auto text-xs text-green-600 font-semibold">
-                    ✓ {availableDestinations.length} routes
-                  </span>
-                )}
+                Destination
               </label>
               <div className="relative">
                 <input
                   type="text"
                   name="toLocation"
-                  placeholder={availableDestinations.length > 0 ? "Select from available destinations" : "Destination (e.g., Bangalore)"}
+                  placeholder="Select destination"
                   value={formik.values.toLocation}
                   onChange={handleLocationChange}
                   onBlur={formik.handleBlur}
@@ -627,37 +622,15 @@ function Flights() {
                 />
                 {activeField === 'to' && suggestions.length > 0 ? (
                   <ul className="absolute z-20 mt-2 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-                    {formik.values.fromLocation && availableDestinations.length > 0 && (
-                      <li className="px-3 py-2 text-xs font-semibold text-green-700 bg-green-50 border-b border-green-200 sticky top-0">
-                        ✈️ Available routes from {formik.values.fromLocation}
+                    {suggestions.map((location) => (
+                      <li
+                        key={location}
+                        className="cursor-pointer px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                        onClick={() => selectSuggestion(location)}
+                      >
+                        {location}
                       </li>
-                    )}
-                    {suggestions.map((location) => {
-                      const isAvailable = availableDestinations.includes(location);
-                      const isFromOrigin = formik.values.fromLocation && availableDestinations.length > 0;
-                      
-                      return (
-                        <li
-                          key={location}
-                          className={`cursor-pointer px-3 py-2 text-sm transition-colors ${
-                            isFromOrigin && isAvailable
-                              ? 'text-green-700 font-semibold bg-green-50 hover:bg-green-100'
-                              : 'text-slate-700 hover:bg-slate-100'
-                          }`}
-                          onClick={() => selectSuggestion(location)}
-                        >
-                          <span className="flex items-center gap-2">
-                            {isFromOrigin && isAvailable && (
-                              <span className="text-green-600">✓</span>
-                            )}
-                            {location}
-                            {isFromOrigin && isAvailable && (
-                              <span className="ml-auto text-xs text-green-600">Common route</span>
-                            )}
-                          </span>
-                        </li>
-                      );
-                    })}
+                    ))}
                   </ul>
                 ) : null}
               </div>
